@@ -315,15 +315,41 @@
         });
       }
       function drawSlot(slot, y, statusFontSize, timeFontSize) {
-        ctx.font = statusFontSize + 'px "Apple Color Emoji", "Segoe UI Emoji", sans-serif';
-        ctx.fillText('🈳', 330, y);
+        drawStatusBadge('空', y, statusFontSize);
         const start = formatTime(slot.start), end = formatTime(slot.end);
         if (start && end) { ctx.fillStyle = '#42303d'; ctx.font = '700 ' + timeFontSize + 'px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif'; ctx.fillText(start + '～' + end, 420, y); }
         else { ctx.fillStyle = '#a16f82'; ctx.font = '600 ' + Math.max(14, timeFontSize - 8) + 'px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif'; ctx.fillText('開始・終了時間を入力してください', 420, y); }
       }
       function drawFullStatus(y, statusFontSize) {
-        ctx.font = statusFontSize + 'px "Apple Color Emoji", "Segoe UI Emoji", sans-serif';
-        ctx.fillText('🈵', 330, y);
+        drawStatusBadge('満', y, statusFontSize);
+      }
+      function drawStatusBadge(status, y, statusFontSize) {
+        const fontSize = Math.max(26, Math.min(38, statusFontSize));
+        const paddingX = Math.round(fontSize * .34);
+        const height = Math.round(fontSize * 1.28);
+        ctx.save();
+        ctx.font = '800 ' + fontSize + 'px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif';
+        const width = Math.ceil(ctx.measureText(status).width + paddingX * 2);
+        const x = 330;
+        const top = Math.round(y - height * .72);
+        const radius = Math.round(height * .22);
+        ctx.fillStyle = status === '満' ? '#ef5a47' : '#258de2';
+        ctx.beginPath();
+        ctx.moveTo(x + radius, top);
+        ctx.lineTo(x + width - radius, top);
+        ctx.quadraticCurveTo(x + width, top, x + width, top + radius);
+        ctx.lineTo(x + width, top + height - radius);
+        ctx.quadraticCurveTo(x + width, top + height, x + width - radius, top + height);
+        ctx.lineTo(x + radius, top + height);
+        ctx.quadraticCurveTo(x, top + height, x, top + height - radius);
+        ctx.lineTo(x, top + radius);
+        ctx.quadraticCurveTo(x, top, x + radius, top);
+        ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(status, x + width / 2, top + height / 2 + 1);
+        ctx.restore();
       }
       function requestDraw() {
         if (drawQueued) return;
