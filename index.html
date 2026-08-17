@@ -354,7 +354,7 @@
         const rowUnits = displayRows.reduce((total, row, index) => {
           const nextRow = displayRows[index + 1];
           const isLastCompactContinuation = row.compactSlots && !row.firstOfDay && (!nextRow || nextRow.dayIndex !== row.dayIndex);
-          return total + (row.compactSlots && !row.firstOfDay ? .5 : 1) + (isLastCompactContinuation ? .5 : 0);
+          return total + (row.compactSlots && !row.firstOfDay ? .5 : 1) + (isLastCompactContinuation ? .25 : 0);
         }, 0);
         const rowHeight = Math.min(120, Math.max(30, Math.floor(760 / rowUnits)));
         const contentHeight = rowHeight * rowUnits;
@@ -377,7 +377,7 @@
           else drawSlot(row.slot, y, dayFontSize, timeFontSize);
           rowTop += currentRowHeight;
           const nextRow = displayRows[rowIndex + 1];
-          if (row.compactSlots && !row.firstOfDay && (!nextRow || nextRow.dayIndex !== row.dayIndex)) rowTop += rowHeight * .5;
+          if (row.compactSlots && !row.firstOfDay && (!nextRow || nextRow.dayIndex !== row.dayIndex)) rowTop += rowHeight * .25;
         });
       }
       function buildDisplayRows(timeFontSize) {
