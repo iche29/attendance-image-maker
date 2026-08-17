@@ -18,6 +18,10 @@
     h2 { margin: 0 0 15px; font-size: 1.1rem; }
     .field-label { display: block; font-size: .88rem; font-weight: 700; margin-bottom: 7px; }
     .upload { display: grid; gap: 8px; margin-bottom: 22px; }
+    .display-settings { display: grid; gap: 10px; margin: 0 0 18px; padding: 13px; background: #fff8fb; border: 1px solid rgba(239, 143, 177, .28); border-radius: 14px; }
+    .day-visibility { display: flex; flex-wrap: wrap; gap: 7px; }
+    .day-visibility label { display: inline-flex; align-items: center; gap: 4px; min-height: 30px; padding: 4px 7px; border: 1px solid #e9cdd7; border-radius: 999px; background: #fff; font-size: .8rem; font-weight: 700; }
+    .day-visibility input { width: 16px; height: 16px; accent-color: var(--pink); }
     input, select, button { font: inherit; }
     input[type="file"], input[type="time"], select { width: 100%; min-width: 0; max-width: 100%; min-height: 42px; border: 1px solid #e9cdd7; border-radius: 10px; padding: 8px 10px; background: #fff; color: var(--ink); }
     .hint { margin: 0; color: #876f7c; font-size: .78rem; line-height: 1.55; }
@@ -89,9 +93,18 @@
             <option value="1080">SNS向け(1080×1080)</option>
           </select>
         </div>
+        <div class="display-settings">
+          <label class="field-label" for="periodMode">表示期間</label>
+          <select id="periodMode">
+            <option value="weekdays">平日(月〜金)</option>
+            <option value="tomorrow">明日から7日間</option>
+          </select>
+          <span class="field-label">表示する曜日</span>
+          <div id="dayVisibility" class="day-visibility" aria-label="表示する曜日"></div>
+        </div>
         <label class="border-toggle"><input id="borderToggle" type="checkbox" checked> パネルにピンクの枠線を付ける</label>
         <div class="schedule-heading">
-          <h2>平日の出勤予定</h2>
+          <h2>出勤予定</h2>
           <button id="resetScheduleButton" class="reset-button" type="button">初期値へ戻す</button>
         </div>
         <div id="scheduleFields" class="schedule-fields"></div>
@@ -106,16 +119,10 @@
   <script>
     (() => {
       'use strict';
-      const STORAGE_KEY = 'attendance-image-maker-v4';
+      const STORAGE_KEY = 'attendance-image-maker-v5';
       const DEFAULT_BACKGROUND_MODE = 'cover';
       const MAX_SLOTS_PER_DAY = 5;
-      const DAYS = [
-        { label: '月曜日', status: '空', slots: [{ start: '09:00', end: '18:00' }] },
-        { label: '火曜日', status: '空', slots: [{ start: '09:00', end: '18:00' }] },
-        { label: '水曜日', status: '空', slots: [{ start: '09:00', end: '18:00' }] },
-        { label: '木曜日', status: '空', slots: [{ start: '09:00', end: '18:00' }] },
-        { label: '金曜日', status: '空', slots: [{ start: '09:00', end: '18:00' }] }
-      ];
+      const WEEKDAYS = ['月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日', '日曜日'];
       const canvas = document.querySelector('#preview');
       const ctx = canvas.getContext('2d');
       const fields = document.querySelector('#scheduleFields');
@@ -124,6 +131,8 @@
       const backgroundModeInput = document.querySelector('#backgroundMode');
       const slotLayoutModeInput = document.querySelector('#slotLayoutMode');
       const outputSizeInput = document.querySelector('#outputSize');
+      const periodModeInput = document.querySelector('#periodMode');
+      const dayVisibility = document.querySelector('#dayVisibility');
       const previewSizeLabel = document.querySelector('#previewSizeLabel');
       const borderToggle = document.querySelector('#borderToggle');
       const saveButton = document.querySelector('#saveButton');
@@ -136,18 +145,19 @@
       function loadState() {
         try {
           const currentSaved = localStorage.getItem(STORAGE_KEY);
-          const saved = JSON.parse(currentSaved || localStorage.getItem('attendance-image-maker-v3') || localStorage.getItem('attendance-image-maker-v2') || localStorage.getItem('attendance-image-maker-v1'));
-          if (saved && Array.isArray(saved.days) && saved.days.length === DAYS.length) {
+          const saved = JSON.parse(currentSaved || localStorage.getItem('attendance-image-maker-v4') || localStorage.getItem('attendance-image-maker-v3') || localStorage.getItem('attendance-image-maker-v2') || localStorage.getItem('attendance-image-maker-v1'));
+          if (saved && Array.isArray(saved.days)) {
             return {
-              days: saved.days.map((day, index) => normalizeDay(day, DAYS[index])),
+              days: createDefaultDays(saved.days),
               showBorder: saved.showBorder !== false,
               backgroundMode: currentSaved && ['tile', 'cover', 'center'].includes(saved.backgroundMode) ? saved.backgroundMode : DEFAULT_BACKGROUND_MODE,
               slotLayoutMode: saved.slotLayoutMode === 'compact' ? 'compact' : 'separate',
-              outputSize: saved.outputSize === 1080 ? 1080 : 800
+              outputSize: saved.outputSize === 1080 ? 1080 : 800,
+              periodMode: saved.periodMode === 'tomorrow' ? 'tomorrow' : 'weekdays'
             };
           }
         } catch (_) { /* 保存内容が壊れている場合は初期値を使う */ }
-        return { days: createDefaultDays(), showBorder: true, backgroundMode: DEFAULT_BACKGROUND_MODE, slotLayoutMode: 'separate', outputSize: 800 };
+        return { days: createDefaultDays(), showBorder: true, backgroundMode: DEFAULT_BACKGROUND_MODE, slotLayoutMode: 'separate', outputSize: 800, periodMode: 'weekdays' };
       }
       function isTime(value) { return typeof value === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(value); }
       function normalizeSlot(slot) {
@@ -158,42 +168,74 @@
       }
       function normalizeDay(day, fallback) {
         const legacySlots = Array.isArray(day && day.slots) ? day.slots : (day && (day.start || day.end) ? [day] : []);
-        const status = day && (day.status === '満' || day.state === '満') ? '満'
+        const status = day && day.status === '休み' ? '休み' : day && (day.status === '満' || day.state === '満') ? '満'
           : legacySlots.length && legacySlots.every(slot => slot && slot.state === '満') ? '満' : '空';
         const availableSlots = legacySlots.filter(slot => !slot || slot.state !== '満').slice(0, MAX_SLOTS_PER_DAY).map(slot => normalizeSlot(slot));
-        return { label: fallback.label, status, slots: status === '満' ? [] : (availableSlots.length ? availableSlots : fallback.slots.map(slot => ({ ...slot }))) };
+        return { label: fallback.label, status, visible: typeof (day && day.visible) === 'boolean' ? day.visible : fallback.visible, slots: availableSlots.length ? availableSlots : fallback.slots.map(slot => ({ ...slot })) };
       }
       function saveState() {
-        try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ days: state.days, showBorder: state.showBorder, backgroundMode: state.backgroundMode, slotLayoutMode: state.slotLayoutMode, outputSize: state.outputSize })); }
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ days: state.days, showBorder: state.showBorder, backgroundMode: state.backgroundMode, slotLayoutMode: state.slotLayoutMode, outputSize: state.outputSize, periodMode: state.periodMode })); }
         catch (_) { /* 保存できなくてもプレビューとPNG生成は継続する */ }
       }
-      function createDefaultDays() { return DAYS.map(day => ({ label: day.label, status: day.status, slots: day.slots.map(slot => ({ ...slot })) })); }
+      function createDefaultDays(savedDays) {
+        return WEEKDAYS.map((label, index) => {
+          const fallback = { label, status: index < 5 ? '空' : '休み', visible: index < 5, slots: [{ start: '09:00', end: '18:00' }] };
+          const savedDay = savedDays && savedDays.find(day => day && day.label === label) || savedDays && savedDays[index];
+          return savedDay ? normalizeDay(savedDay, fallback) : fallback;
+        });
+      }
+      function makeVisibilityControls() {
+        dayVisibility.replaceChildren(...state.days.map((day, index) => {
+          const label = document.createElement('label');
+          const input = document.createElement('input');
+          input.type = 'checkbox';
+          input.checked = day.visible;
+          input.dataset.dayIndex = String(index);
+          input.dataset.field = 'visible';
+          label.append(input, day.label.replace('曜日', ''));
+          return label;
+        }));
+      }
+      function getDisplayDays() {
+        if (state.periodMode !== 'tomorrow') return state.days.map((day, dayIndex) => ({ day, dayIndex, label: day.label })).filter(item => item.day.visible);
+        const tomorrow = new Date();
+        tomorrow.setHours(0, 0, 0, 0);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        return Array.from({ length: 7 }, (_, offset) => {
+          const date = new Date(tomorrow);
+          date.setDate(tomorrow.getDate() + offset);
+          const dayIndex = (date.getDay() + 6) % 7;
+          const day = state.days[dayIndex];
+          return { day, dayIndex, label: `${date.getMonth() + 1}/${date.getDate()}(${day.label.slice(0, 1)})` };
+        }).filter(item => item.day.visible);
+      }
       function makeFields() {
-        fields.replaceChildren(...state.days.map((day, index) => {
+        const visibleDays = getDisplayDays();
+        fields.replaceChildren(...visibleDays.map(({ day, dayIndex, label }) => {
           const row = document.createElement('div');
           row.className = 'day-field';
           const title = document.createElement('h3');
           title.className = 'day-name';
-          title.textContent = day.label;
+          title.textContent = label;
           row.append(title);
-          row.append(makeDayStatusField(index, day.status));
-          if (day.status === '満') {
+          row.append(makeDayStatusField(dayIndex, day.status));
+          if (day.status === '満' || day.status === '休み') {
             const fullMessage = document.createElement('p');
             fullMessage.className = 'hint';
-            fullMessage.textContent = 'この曜日は満枠です。時間帯は入力しません。';
+            fullMessage.textContent = day.status === '満' ? '満枠です。時間帯は入力しません。' : 'お休みです。時間帯は入力しません。';
             row.append(fullMessage);
             return row;
           }
           const slotList = document.createElement('div');
           slotList.className = 'slot-list';
-          day.slots.forEach((slot, slotIndex) => slotList.append(makeSlotField(index, slotIndex, slot)));
+          day.slots.forEach((slot, slotIndex) => slotList.append(makeSlotField(dayIndex, slotIndex, slot)));
           row.append(slotList);
           if (day.slots.length < MAX_SLOTS_PER_DAY) {
             const addButton = document.createElement('button');
             addButton.className = 'add-slot-button';
             addButton.type = 'button';
             addButton.dataset.action = 'add-slot';
-            addButton.dataset.dayIndex = String(index);
+            addButton.dataset.dayIndex = String(dayIndex);
             addButton.textContent = '＋ 時間帯を追加';
             row.append(addButton);
           }
@@ -209,6 +251,7 @@
         select.dataset.field = 'status';
         select.add(new Option('空', '空'));
         select.add(new Option('満', '満'));
+        select.add(new Option('休み', '休み'));
         select.value = status;
         label.append(select);
         return label;
@@ -296,12 +339,12 @@
         ctx.clearRect(0, 0, 1080, 1080);
         drawTiledBackground();
         const displayRows = [];
-        state.days.forEach((day, dayIndex) => {
-          if (day.status === '満') displayRows.push({ day, dayIndex, full: true, firstOfDay: true });
+        getDisplayDays().forEach(({ day, dayIndex, label }) => {
+          if (day.status === '満' || day.status === '休み') displayRows.push({ day, dayIndex, label, message: day.status === '満' ? '満枠ありがとう' : 'お休み', firstOfDay: true });
           else if (state.slotLayoutMode === 'compact') {
-            day.slots.forEach((slot, slotIndex) => displayRows.push({ day, dayIndex, slot, firstOfDay: slotIndex === 0, showDay: slotIndex === 0 }));
+            day.slots.forEach((slot, slotIndex) => displayRows.push({ day, dayIndex, label, slot, firstOfDay: slotIndex === 0, showDay: slotIndex === 0 }));
           }
-          else day.slots.forEach((slot, slotIndex) => displayRows.push({ day, dayIndex, slot, firstOfDay: slotIndex === 0, showDay: true }));
+          else day.slots.forEach((slot, slotIndex) => displayRows.push({ day, dayIndex, label, slot, firstOfDay: slotIndex === 0, showDay: true }));
         });
         const rowHeight = Math.min(120, Math.max(30, Math.floor(760 / displayRows.length)));
         const contentHeight = rowHeight * displayRows.length;
@@ -316,8 +359,8 @@
         let y = panel.y + 60 + rowHeight / 2;
         displayRows.forEach((row, rowIndex) => {
           if (row.dayIndex > 0 && row.firstOfDay) { ctx.save(); ctx.setLineDash([4, 12]); ctx.strokeStyle = 'rgba(221, 152, 178, .52)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(150, y - rowHeight / 2); ctx.lineTo(930, y - rowHeight / 2); ctx.stroke(); ctx.restore(); }
-          if (row.showDay || row.full) { ctx.fillStyle = '#6f5264'; ctx.font = '700 ' + dayFontSize + 'px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif'; ctx.fillText(row.day.label, 150, y); }
-          if (row.full) drawFullStatus(y, dayFontSize);
+          if (row.showDay || row.message) { ctx.fillStyle = '#6f5264'; ctx.font = '700 ' + dayFontSize + 'px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif'; ctx.fillText(row.label, 150, y); }
+          if (row.message) drawStatusMessage(row.day.status, row.message, y, dayFontSize, timeFontSize);
           else drawSlot(row.slot, y, dayFontSize, timeFontSize);
           y += rowHeight;
         });
@@ -328,8 +371,11 @@
         if (start && end) { ctx.fillStyle = '#42303d'; ctx.font = '700 ' + timeFontSize + 'px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif'; ctx.fillText(start + '～' + end, 420, y); }
         else { ctx.fillStyle = '#a16f82'; ctx.font = '600 ' + Math.max(14, timeFontSize - 8) + 'px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif'; ctx.fillText('開始・終了時間を入力してください', 420, y); }
       }
-      function drawFullStatus(y, statusFontSize) {
-        drawStatusEmoji('🈵', y, statusFontSize);
+      function drawStatusMessage(status, message, y, statusFontSize, messageFontSize) {
+        drawStatusEmoji(status === '満' ? '🈵' : '🌙', y, statusFontSize);
+        ctx.fillStyle = status === '満' ? '#b74b5a' : '#746775';
+        ctx.font = '700 ' + messageFontSize + 'px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif';
+        ctx.fillText(message, 420, y);
       }
       function drawStatusEmoji(emoji, y, statusFontSize) {
         ctx.save();
@@ -343,7 +389,7 @@
         drawQueued = true;
         requestAnimationFrame(() => { drawQueued = false; drawPreview(); });
       }
-      function hasIncompleteTime() { return state.days.some(day => day.status === '空' && day.slots.some(slot => !isTime(slot.start) || !isTime(slot.end))); }
+      function hasIncompleteTime() { return getDisplayDays().some(({ day }) => day.status === '空' && day.slots.some(slot => !isTime(slot.start) || !isTime(slot.end))); }
       function updateSaveState() {
         const incomplete = hasIncompleteTime();
         saveButton.disabled = incomplete;
@@ -365,6 +411,17 @@
       }
       fields.addEventListener('input', updateDay);
       fields.addEventListener('change', updateDay);
+      dayVisibility.addEventListener('change', event => {
+        const target = event.target;
+        const dayIndex = Number(target.dataset.dayIndex);
+        if (!Number.isInteger(dayIndex) || target.dataset.field !== 'visible') return;
+        if (!target.checked && state.days.filter(day => day.visible).length === 1) {
+          target.checked = true;
+          return;
+        }
+        state.days[dayIndex].visible = target.checked;
+        makeFields(); saveState(); requestDraw(); updateSaveState();
+      });
       fields.addEventListener('click', event => {
         const button = event.target.closest('button[data-action]');
         if (!button) return;
@@ -382,9 +439,15 @@
       backgroundModeInput.addEventListener('change', () => { state.backgroundMode = backgroundModeInput.value; saveState(); requestDraw(); });
       slotLayoutModeInput.addEventListener('change', () => { state.slotLayoutMode = slotLayoutModeInput.value; saveState(); requestDraw(); });
       outputSizeInput.addEventListener('change', () => { state.outputSize = Number(outputSizeInput.value); updateOutputSizeLabel(); saveState(); });
+      periodModeInput.addEventListener('change', () => {
+        state.periodMode = periodModeInput.value;
+        state.days.forEach((day, index) => { day.visible = state.periodMode === 'tomorrow' || index < 5; });
+        makeVisibilityControls(); makeFields(); saveState(); requestDraw(); updateSaveState();
+      });
       resetScheduleButton.addEventListener('click', () => {
-        if (!window.confirm('月曜日から金曜日までの出勤予定を、すべて「空・9:00〜18:00」へ戻します。よろしいですか？')) return;
-        state.days = createDefaultDays();
+        if (!window.confirm('表示する曜日は維持し、出勤予定を初期値へ戻します。よろしいですか？')) return;
+        const visibleDays = state.days.map(day => day.visible);
+        state.days = createDefaultDays().map((day, index) => ({ ...day, visible: visibleDays[index] }));
         makeFields(); saveState(); requestDraw(); updateSaveState();
       });
       async function readImageDimensions(file) {
@@ -491,7 +554,8 @@
       backgroundModeInput.value = state.backgroundMode;
       slotLayoutModeInput.value = state.slotLayoutMode;
       outputSizeInput.value = String(state.outputSize);
-      makeFields(); drawPreview(); updateSaveState(); updateOutputSizeLabel(); saveState();
+      periodModeInput.value = state.periodMode;
+      makeVisibilityControls(); makeFields(); drawPreview(); updateSaveState(); updateOutputSizeLabel(); saveState();
     })();
   </script>
 </body>
