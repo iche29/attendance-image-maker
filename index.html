@@ -23,6 +23,8 @@
     .hint { margin: 0; color: #876f7c; font-size: .78rem; line-height: 1.55; }
     .border-toggle { display: flex; align-items: center; gap: 9px; margin: 0 0 18px; font-size: .92rem; }
     .border-toggle input { width: 18px; height: 18px; accent-color: var(--pink); }
+    .schedule-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 15px; }
+    .schedule-heading h2 { margin: 0; }
     .schedule-fields { display: grid; gap: 12px; }
     .day-field { padding: 16px; background: var(--pink-soft); border-radius: 14px; }
     .day-name { display: block; margin: 0 0 11px; font-size: 1.12rem; font-weight: 800; }
@@ -47,7 +49,7 @@
     .add-slot-button, .remove-slot-button { min-height: 34px; border: 1px solid #e9a8bf; border-radius: 9px; cursor: pointer; font-size: .82rem; font-weight: 700; }
     .add-slot-button { width: 100%; margin-top: 10px; color: #b64f78; background: #fff; }
     .remove-slot-button { padding: 4px 9px; color: #9c5e72; background: transparent; }
-    .reset-button { width: 100%; margin-top: 18px; min-height: 42px; border: 1px solid #d9a7b8; border-radius: 10px; cursor: pointer; color: #8d5267; background: #fff; font-size: .9rem; font-weight: 700; }
+    .reset-button { flex: 0 0 auto; min-height: 34px; border: 1px solid #d9a7b8; border-radius: 9px; cursor: pointer; color: #8d5267; background: #fff; font-size: .78rem; font-weight: 700; padding: 5px 9px; }
     button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid rgba(239, 143, 177, .42); outline-offset: 2px; }
     @media (max-width: 760px) { .app { padding: 22px 14px 36px; } .layout { grid-template-columns: 1fr; gap: 20px; } .preview-card { order: 2; } .controls { order: 1; } }
     @media (max-width: 480px) { .time-fields { grid-template-columns: 1fr; gap: 10px; } }
@@ -84,9 +86,11 @@
           </select>
         </div>
         <label class="border-toggle"><input id="borderToggle" type="checkbox" checked> パネルにピンクの枠線を付ける</label>
-        <h2>平日の出勤予定</h2>
+        <div class="schedule-heading">
+          <h2>平日の出勤予定</h2>
+          <button id="resetScheduleButton" class="reset-button" type="button">初期値へ戻す</button>
+        </div>
         <div id="scheduleFields" class="schedule-fields"></div>
-        <button id="resetScheduleButton" class="reset-button" type="button">出勤予定を初期値へ戻す</button>
       </section>
       <section class="preview-card" aria-label="完成イメージ">
         <div class="preview-heading"><h2>プレビュー</h2><span id="previewSizeLabel" class="hint">800×800px</span></div>
