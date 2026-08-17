@@ -301,7 +301,7 @@
         ctx.fillStyle = 'rgba(255, 255, 255, .82)'; ctx.fill();
         if (state.showBorder) { ctx.strokeStyle = 'rgba(239, 143, 177, .72)'; ctx.lineWidth = 4; ctx.stroke(); }
         ctx.textBaseline = 'middle';
-        const dayFontSize = Math.min(34, Math.max(14, Math.round(rowHeight * .31)));
+        const dayFontSize = Math.min(42, Math.max(16, Math.round(rowHeight * .36)));
         const timeFontSize = Math.min(45, Math.max(16, Math.round(rowHeight * .40)));
         let y = panel.y + 60 + rowHeight / 2;
         displayRows.forEach((row, rowIndex) => {
@@ -315,14 +315,14 @@
       }
       function drawSlot(slot, y, statusFontSize, timeFontSize) {
         ctx.font = statusFontSize + 'px "Apple Color Emoji", "Segoe UI Emoji", sans-serif';
-        ctx.fillText('🈳', 380, y);
+        ctx.fillText('🈳', 330, y);
         const start = formatTime(slot.start), end = formatTime(slot.end);
-        if (start && end) { ctx.fillStyle = '#42303d'; ctx.font = '700 ' + timeFontSize + 'px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif'; ctx.fillText(start + '～' + end, 470, y); }
-        else { ctx.fillStyle = '#a16f82'; ctx.font = '600 ' + Math.max(14, timeFontSize - 8) + 'px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif'; ctx.fillText('開始・終了時間を入力してください', 470, y); }
+        if (start && end) { ctx.fillStyle = '#42303d'; ctx.font = '700 ' + timeFontSize + 'px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif'; ctx.fillText(start + '～' + end, 420, y); }
+        else { ctx.fillStyle = '#a16f82'; ctx.font = '600 ' + Math.max(14, timeFontSize - 8) + 'px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif'; ctx.fillText('開始・終了時間を入力してください', 420, y); }
       }
       function drawFullStatus(y, statusFontSize) {
         ctx.font = statusFontSize + 'px "Apple Color Emoji", "Segoe UI Emoji", sans-serif';
-        ctx.fillText('🈵', 380, y);
+        ctx.fillText('🈵', 330, y);
       }
       function drawCompactSlots(slots, y, baseFontSize) {
         const summary = slots.map(slot => {
@@ -336,7 +336,7 @@
           if (ctx.measureText(summary).width <= 570 || fontSize === 14) break;
           fontSize -= 1;
         } while (fontSize >= 14);
-        ctx.fillText(summary, 360, y);
+        ctx.fillText(summary, 320, y);
       }
       function requestDraw() {
         if (drawQueued) return;
