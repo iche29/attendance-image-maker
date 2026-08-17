@@ -68,7 +68,7 @@
           <label class="field-label" for="backgroundMode">背景の表示</label>
           <select id="backgroundMode">
             <option value="tile">繰り返し（元画像サイズ）</option>
-            <option value="cover">全面表示</option>
+            <option value="cover">全面表示（隙間なし）</option>
             <option value="center">中央配置</option>
           </select>
           <label class="field-label" for="slotLayoutMode">複数枠の表示</label>
@@ -92,7 +92,8 @@
   <script>
     (() => {
       'use strict';
-      const STORAGE_KEY = 'attendance-image-maker-v3';
+      const STORAGE_KEY = 'attendance-image-maker-v4';
+      const DEFAULT_BACKGROUND_MODE = 'cover';
       const MAX_SLOTS_PER_DAY = 5;
       const DAYS = [
         { label: '月曜日', status: '空', slots: [{ start: '09:00', end: '18:00' }] },
@@ -118,17 +119,18 @@
 
       function loadState() {
         try {
-          const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || localStorage.getItem('attendance-image-maker-v2') || localStorage.getItem('attendance-image-maker-v1'));
+          const currentSaved = localStorage.getItem(STORAGE_KEY);
+          const saved = JSON.parse(currentSaved || localStorage.getItem('attendance-image-maker-v3') || localStorage.getItem('attendance-image-maker-v2') || localStorage.getItem('attendance-image-maker-v1'));
           if (saved && Array.isArray(saved.days) && saved.days.length === DAYS.length) {
             return {
               days: saved.days.map((day, index) => normalizeDay(day, DAYS[index])),
               showBorder: saved.showBorder !== false,
-              backgroundMode: ['tile', 'cover', 'center'].includes(saved.backgroundMode) ? saved.backgroundMode : 'tile',
+              backgroundMode: currentSaved && ['tile', 'cover', 'center'].includes(saved.backgroundMode) ? saved.backgroundMode : DEFAULT_BACKGROUND_MODE,
               slotLayoutMode: saved.slotLayoutMode === 'compact' ? 'compact' : 'separate'
             };
           }
         } catch (_) { /* 保存内容が壊れている場合は初期値を使う */ }
-        return { days: createDefaultDays(), showBorder: true, backgroundMode: 'tile', slotLayoutMode: 'separate' };
+        return { days: createDefaultDays(), showBorder: true, backgroundMode: DEFAULT_BACKGROUND_MODE, slotLayoutMode: 'separate' };
       }
       function isTime(value) { return typeof value === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(value); }
       function normalizeSlot(slot) {
