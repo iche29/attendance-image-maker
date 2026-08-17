@@ -412,7 +412,7 @@
         else { ctx.fillStyle = '#a16f82'; ctx.font = '600 ' + Math.max(14, timeFontSize - 8) + 'px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif'; ctx.fillText('開始・終了時間を入力してください', 420, y); }
       }
       function drawCompactSlots(slots, showStatus, continues, y, statusFontSize, timeFontSize) {
-        let x = showStatus ? 330 : 420;
+        let x = showStatus ? 330 : 380;
         ctx.save();
         ctx.font = '700 ' + timeFontSize + 'px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif';
         const separatorWidth = ctx.measureText(' / ').width;
