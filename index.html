@@ -358,7 +358,8 @@
         }, 0);
         const rowHeight = Math.min(120, Math.max(30, Math.floor(760 / rowUnits)));
         const contentHeight = rowHeight * rowUnits;
-        const panelHeight = Math.min(960, contentHeight + 120);
+        const panelPadding = 48;
+        const panelHeight = Math.min(960, contentHeight + panelPadding * 2);
         const panel = { x: 76, y: (1080 - panelHeight) / 2, width: 928, height: panelHeight, radius: 48 };
         roundedRect(panel.x, panel.y, panel.width, panel.height, panel.radius);
         ctx.fillStyle = 'rgba(255, 255, 255, .82)'; ctx.fill();
@@ -366,7 +367,7 @@
         ctx.textBaseline = 'middle';
         const dayFontSize = Math.min(42, Math.max(16, Math.round(rowHeight * .36)));
         const timeFontSize = Math.min(45, Math.max(16, Math.round(rowHeight * .40)));
-        let rowTop = panel.y + 60;
+        let rowTop = panel.y + panelPadding;
         displayRows.forEach((row, rowIndex) => {
           const currentRowHeight = row.compactSlots && !row.firstOfDay ? rowHeight * .5 : rowHeight;
           const y = rowTop + currentRowHeight / 2;
