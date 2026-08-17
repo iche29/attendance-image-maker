@@ -326,12 +326,17 @@
       function drawStatusBadge(status, y, statusFontSize) {
         const fontSize = Math.max(26, Math.min(38, statusFontSize));
         const paddingX = Math.round(fontSize * .34);
-        const height = Math.round(fontSize * 1.28);
+        const paddingY = Math.round(fontSize * .16);
         ctx.save();
         ctx.font = '800 ' + fontSize + 'px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif';
-        const width = Math.ceil(ctx.measureText(status).width + paddingX * 2);
+        ctx.textBaseline = 'alphabetic';
+        const metrics = ctx.measureText(status);
+        const ascent = metrics.actualBoundingBoxAscent || Math.round(fontSize * .8);
+        const descent = metrics.actualBoundingBoxDescent || Math.round(fontSize * .2);
+        const width = Math.ceil(metrics.width + paddingX * 2);
+        const height = Math.ceil(ascent + descent + paddingY * 2);
         const x = 330;
-        const top = Math.round(y - height * .72);
+        const top = Math.round(y - ascent - paddingY);
         const radius = Math.round(height * .22);
         ctx.fillStyle = status === '満' ? '#ef5a47' : '#258de2';
         ctx.beginPath();
@@ -347,8 +352,7 @@
         ctx.fill();
         ctx.fillStyle = '#fff';
         ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(status, x + width / 2, top + height / 2 + 1);
+        ctx.fillText(status, x + width / 2, y);
         ctx.restore();
       }
       function requestDraw() {
