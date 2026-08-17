@@ -334,7 +334,7 @@
       function drawStatusEmoji(emoji, y, statusFontSize) {
         ctx.save();
         ctx.font = statusFontSize + 'px "Apple Color Emoji", "Segoe UI Emoji", sans-serif';
-        ctx.textBaseline = 'alphabetic';
+        ctx.textBaseline = 'middle';
         ctx.fillText(emoji, 330, y);
         ctx.restore();
       }
