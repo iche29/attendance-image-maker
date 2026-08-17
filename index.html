@@ -52,7 +52,11 @@
     .reset-button { flex: 0 0 auto; min-height: 34px; border: 1px solid #d9a7b8; border-radius: 9px; cursor: pointer; color: #8d5267; background: #fff; font-size: .78rem; font-weight: 700; padding: 5px 9px; }
     button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid rgba(239, 143, 177, .42); outline-offset: 2px; }
     @media (max-width: 760px) { .app { padding: 22px 14px 36px; } .layout { grid-template-columns: 1fr; gap: 20px; } .preview-card { order: 2; } .controls { order: 1; } }
-    @media (max-width: 480px) { .time-fields { grid-template-columns: 1fr; gap: 10px; } }
+    @media (max-width: 480px) {
+      .time-fields { grid-template-columns: 1fr; gap: 10px; }
+      .time-fields label { padding-right: 24px; }
+      .time-fields input[type="time"] { -webkit-appearance: none; appearance: none; }
+    }
   </style>
 </head>
 <body>
@@ -295,9 +299,9 @@
         state.days.forEach((day, dayIndex) => {
           if (day.status === '満') displayRows.push({ day, dayIndex, full: true, firstOfDay: true });
           else if (state.slotLayoutMode === 'compact') {
-            day.slots.forEach((slot, slotIndex) => displayRows.push({ day, dayIndex, slot, firstOfDay: slotIndex === 0, compact: true }));
+            day.slots.forEach((slot, slotIndex) => displayRows.push({ day, dayIndex, slot, firstOfDay: slotIndex === 0, showDay: slotIndex === 0 }));
           }
-          else day.slots.forEach((slot, slotIndex) => displayRows.push({ day, dayIndex, slot, firstOfDay: slotIndex === 0 }));
+          else day.slots.forEach((slot, slotIndex) => displayRows.push({ day, dayIndex, slot, firstOfDay: slotIndex === 0, showDay: true }));
         });
         const rowHeight = Math.min(120, Math.max(30, Math.floor(760 / displayRows.length)));
         const contentHeight = rowHeight * displayRows.length;
@@ -312,7 +316,7 @@
         let y = panel.y + 60 + rowHeight / 2;
         displayRows.forEach((row, rowIndex) => {
           if (row.dayIndex > 0 && row.firstOfDay) { ctx.save(); ctx.setLineDash([4, 12]); ctx.strokeStyle = 'rgba(221, 152, 178, .52)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(150, y - rowHeight / 2); ctx.lineTo(930, y - rowHeight / 2); ctx.stroke(); ctx.restore(); }
-          if (row.firstOfDay) { ctx.fillStyle = '#6f5264'; ctx.font = '700 ' + dayFontSize + 'px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif'; ctx.fillText(row.day.label, 150, y); }
+          if (row.showDay || row.full) { ctx.fillStyle = '#6f5264'; ctx.font = '700 ' + dayFontSize + 'px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif'; ctx.fillText(row.day.label, 150, y); }
           if (row.full) drawFullStatus(y, dayFontSize);
           else drawSlot(row.slot, y, dayFontSize, timeFontSize);
           y += rowHeight;
