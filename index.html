@@ -290,7 +290,9 @@
         const displayRows = [];
         state.days.forEach((day, dayIndex) => {
           if (day.status === '満') displayRows.push({ day, dayIndex, full: true, firstOfDay: true });
-          else if (state.slotLayoutMode === 'compact') displayRows.push({ day, dayIndex, slots: day.slots, firstOfDay: true });
+          else if (state.slotLayoutMode === 'compact') {
+            day.slots.forEach((slot, slotIndex) => displayRows.push({ day, dayIndex, slot, firstOfDay: slotIndex === 0, compact: true }));
+          }
           else day.slots.forEach((slot, slotIndex) => displayRows.push({ day, dayIndex, slot, firstOfDay: slotIndex === 0 }));
         });
         const rowHeight = Math.min(120, Math.max(30, Math.floor(760 / displayRows.length)));
@@ -308,7 +310,6 @@
           if (row.dayIndex > 0 && row.firstOfDay) { ctx.save(); ctx.setLineDash([4, 12]); ctx.strokeStyle = 'rgba(221, 152, 178, .52)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(150, y - rowHeight / 2); ctx.lineTo(930, y - rowHeight / 2); ctx.stroke(); ctx.restore(); }
           if (row.firstOfDay) { ctx.fillStyle = '#6f5264'; ctx.font = '700 ' + dayFontSize + 'px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif'; ctx.fillText(row.day.label, 150, y); }
           if (row.full) drawFullStatus(y, dayFontSize);
-          else if (state.slotLayoutMode === 'compact') drawCompactSlots(row.slots, y, timeFontSize);
           else drawSlot(row.slot, y, dayFontSize, timeFontSize);
           y += rowHeight;
         });
@@ -323,20 +324,6 @@
       function drawFullStatus(y, statusFontSize) {
         ctx.font = statusFontSize + 'px "Apple Color Emoji", "Segoe UI Emoji", sans-serif';
         ctx.fillText('🈵', 330, y);
-      }
-      function drawCompactSlots(slots, y, baseFontSize) {
-        const summary = slots.map(slot => {
-          const start = formatTime(slot.start), end = formatTime(slot.end);
-          return start && end ? '🈳 ' + start + '～' + end : '🈳 時間未入力';
-        }).join('  /  ');
-        let fontSize = Math.min(28, Math.max(14, baseFontSize));
-        ctx.fillStyle = '#42303d';
-        do {
-          ctx.font = '700 ' + fontSize + 'px -apple-system, BlinkMacSystemFont, "Apple Color Emoji", "Segoe UI Emoji", "Hiragino Sans", "Yu Gothic", sans-serif';
-          if (ctx.measureText(summary).width <= 570 || fontSize === 14) break;
-          fontSize -= 1;
-        } while (fontSize >= 14);
-        ctx.fillText(summary, 320, y);
       }
       function requestDraw() {
         if (drawQueued) return;
