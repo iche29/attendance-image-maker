@@ -343,7 +343,13 @@
       function drawPreview() {
         ctx.clearRect(0, 0, 1080, 1080);
         drawTiledBackground();
-        const typographyRowCount = Math.max(1, getDisplayDays().reduce((count, { day }) => count + (day.status === '空' ? day.slots.length : 1), 0));
+        let typographyRowCount = Math.max(1, getDisplayDays().reduce((count, { day }) => count + (day.status === '空' ? day.slots.length : 1), 0));
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          const estimatedTimeFontSize = Math.min(45, Math.max(16, Math.round(Math.min(120, Math.max(30, Math.floor(760 / typographyRowCount))) * .40)));
+          const compactRows = buildDisplayRows(estimatedTimeFontSize, 'compact');
+          if (compactRows.length === typographyRowCount) break;
+          typographyRowCount = compactRows.length;
+        }
         let rowCount = typographyRowCount;
         let displayRows = [];
         for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -383,14 +389,14 @@
           if (row.compactSlots && !row.firstOfDay && (!nextRow || nextRow.dayIndex !== row.dayIndex)) rowTop += rowHeight * .25;
         });
       }
-      function buildDisplayRows(timeFontSize) {
+      function buildDisplayRows(timeFontSize, layoutMode = state.slotLayoutMode) {
         const rows = [];
         getDisplayDays().forEach(({ day, dayIndex, label }) => {
           if (day.status === '満' || day.status === '休み') {
             rows.push({ day, dayIndex, label, message: day.status === '満' ? '満枠ありがとう' : 'お休み', firstOfDay: true });
             return;
           }
-          if (state.slotLayoutMode !== 'compact') {
+          if (layoutMode !== 'compact') {
             day.slots.forEach((slot, slotIndex) => rows.push({ day, dayIndex, label, slot, firstOfDay: slotIndex === 0, showDay: slotIndex === 0 }));
             return;
           }
