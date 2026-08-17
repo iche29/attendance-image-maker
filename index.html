@@ -78,8 +78,8 @@
           </select>
           <label class="field-label" for="outputSize">画像サイズ</label>
           <select id="outputSize">
-            <option value="800">CityHeaven向け (800 × 800)</option>
-            <option value="1080">SNS向け (1080 × 1080)</option>
+            <option value="800">CH向け(800×800)</option>
+            <option value="1080">SNS向け(1080×1080)</option>
           </select>
         </div>
         <label class="border-toggle"><input id="borderToggle" type="checkbox" checked> パネルにピンクの枠線を付ける</label>
@@ -88,7 +88,7 @@
         <button id="resetScheduleButton" class="reset-button" type="button">出勤予定を初期値へ戻す</button>
       </section>
       <section class="preview-card" aria-label="完成イメージ">
-        <div class="preview-heading"><h2>プレビュー</h2><span id="previewSizeLabel" class="hint">800 × 800 px</span></div>
+        <div class="preview-heading"><h2>プレビュー</h2><span id="previewSizeLabel" class="hint">800×800px</span></div>
         <div class="canvas-wrap"><canvas id="preview" width="1080" height="1080" aria-label="出勤案内画像のプレビュー"></canvas></div>
         <div class="save-row"><button id="saveButton" type="button">PNG保存</button></div>
       </section>
@@ -348,7 +348,7 @@
         saveButton.disabled = incomplete;
         saveButton.textContent = incomplete ? '開始・終了時間を入力してください' : 'PNG保存';
       }
-      function updateOutputSizeLabel() { previewSizeLabel.textContent = state.outputSize + ' × ' + state.outputSize + ' px'; }
+      function updateOutputSizeLabel() { previewSizeLabel.textContent = state.outputSize + '×' + state.outputSize + 'px'; }
       function updateDay(event) {
         const target = event.target;
         const dayIndex = Number(target.dataset.dayIndex);
