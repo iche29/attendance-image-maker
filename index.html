@@ -503,8 +503,11 @@
       });
       resetScheduleButton.addEventListener('click', () => {
         if (!window.confirm('表示する曜日は維持し、出勤予定を初期値へ戻します。よろしいですか？')) return;
-        const visibleDays = state.days.map(day => day.visible);
-        state.days = createDefaultDays().map((day, index) => ({ ...day, visible: visibleDays[index] }));
+        state.days.forEach(day => {
+          day.status = '空';
+          day.slots = [{ start: '09:00', end: '18:00' }];
+        });
+        backgroundMessage.textContent = '出勤予定をすべて「空・9:00〜18:00」へ戻しました。';
         makeFields(); saveState(); requestDraw(); updateSaveState();
       });
       async function readImageDimensions(file) {
