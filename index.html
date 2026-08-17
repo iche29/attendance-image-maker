@@ -287,6 +287,7 @@
         label.append(labelText);
         const input = document.createElement('input');
         input.type = 'time';
+        input.step = '600';
         input.value = value;
         input.dataset.dayIndex = String(dayIndex);
         input.dataset.slotIndex = String(slotIndex);
