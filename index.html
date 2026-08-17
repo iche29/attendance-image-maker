@@ -343,7 +343,8 @@
       function drawPreview() {
         ctx.clearRect(0, 0, 1080, 1080);
         drawTiledBackground();
-        let rowCount = Math.max(1, getDisplayDays().reduce((count, { day }) => count + (day.status === '空' ? day.slots.length : 1), 0));
+        const typographyRowCount = Math.max(1, getDisplayDays().reduce((count, { day }) => count + (day.status === '空' ? day.slots.length : 1), 0));
+        let rowCount = typographyRowCount;
         let displayRows = [];
         for (let attempt = 0; attempt < 3; attempt += 1) {
           const estimatedTimeFontSize = Math.min(45, Math.max(16, Math.round(Math.min(120, Math.max(30, Math.floor(760 / rowCount))) * .40)));
@@ -365,8 +366,9 @@
         ctx.fillStyle = 'rgba(255, 255, 255, .82)'; ctx.fill();
         if (state.showBorder) { ctx.strokeStyle = 'rgba(239, 143, 177, .72)'; ctx.lineWidth = 4; ctx.stroke(); }
         ctx.textBaseline = 'middle';
-        const dayFontSize = Math.min(42, Math.max(16, Math.round(rowHeight * .36)));
-        const timeFontSize = Math.min(45, Math.max(16, Math.round(rowHeight * .40)));
+        const typographyRowHeight = Math.min(120, Math.max(30, Math.floor(760 / typographyRowCount)));
+        const dayFontSize = Math.min(42, Math.max(16, Math.round(typographyRowHeight * .36)));
+        const timeFontSize = Math.min(45, Math.max(16, Math.round(typographyRowHeight * .40)));
         let rowTop = panel.y + panelPadding;
         displayRows.forEach((row, rowIndex) => {
           const currentRowHeight = row.compactSlots && !row.firstOfDay ? rowHeight * .5 : rowHeight;
@@ -400,7 +402,7 @@
           let firstCompactRow = true;
           day.slots.forEach(slot => {
             const text = formatTime(slot.start) && formatTime(slot.end) ? formatTime(slot.start) + '～' + formatTime(slot.end) : '開始・終了時間を入力してください';
-            const slotWidth = (compactSlots.length === 0 && firstCompactRow ? 64 : 0) + ctx.measureText(text).width;
+            const slotWidth = (compactSlots.length === 0 && firstCompactRow ? 104 : 0) + ctx.measureText(text).width;
             if (compactSlots.length && usedWidth + separatorWidth + slotWidth > 510) {
               rows.push({ day, dayIndex, label, compactSlots, showStatus: firstCompactRow, continues: true, firstOfDay: rows.length === 0 || rows[rows.length - 1].dayIndex !== dayIndex, showDay: rows.length === 0 || rows[rows.length - 1].dayIndex !== dayIndex });
               compactSlots = [];
@@ -422,14 +424,14 @@
         else { ctx.fillStyle = '#a16f82'; ctx.font = '600 ' + Math.max(14, timeFontSize - 8) + 'px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif'; ctx.fillText('開始・終了時間を入力してください', 420, y); }
       }
       function drawCompactSlots(slots, showStatus, continues, y, statusFontSize, timeFontSize) {
-        let x = showStatus ? 330 : 380;
+        let x = showStatus ? 330 : 420;
         ctx.save();
         ctx.font = '700 ' + timeFontSize + 'px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif';
         const separatorWidth = ctx.measureText(' / ').width;
         ctx.restore();
         slots.forEach((slot, index) => {
           if (index > 0) { ctx.fillStyle = '#876f7c'; ctx.font = '600 ' + Math.max(14, timeFontSize - 6) + 'px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif'; ctx.fillText('/', x, y); x += separatorWidth; }
-          if (index === 0 && showStatus) { drawStatusEmoji('🈳', y, statusFontSize, x); x += 50; }
+          if (index === 0 && showStatus) { drawStatusEmoji('🈳', y, statusFontSize, x); x += 90; }
           const start = formatTime(slot.start), end = formatTime(slot.end);
           const text = start && end ? start + '～' + end : '開始・終了時間を入力してください';
           ctx.fillStyle = start && end ? '#42303d' : '#a16f82';
