@@ -389,7 +389,7 @@
             return;
           }
           if (state.slotLayoutMode !== 'compact') {
-            day.slots.forEach((slot, slotIndex) => rows.push({ day, dayIndex, label, slot, firstOfDay: slotIndex === 0, showDay: true }));
+            day.slots.forEach((slot, slotIndex) => rows.push({ day, dayIndex, label, slot, firstOfDay: slotIndex === 0, showDay: slotIndex === 0 }));
             return;
           }
           ctx.save();
