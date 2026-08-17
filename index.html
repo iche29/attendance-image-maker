@@ -323,20 +323,19 @@
         });
       }
       function drawSlot(slot, y, statusFontSize, timeFontSize) {
-        drawStatusText('空', y, statusFontSize);
+        drawStatusEmoji('🈳', y, statusFontSize);
         const start = formatTime(slot.start), end = formatTime(slot.end);
         if (start && end) { ctx.fillStyle = '#42303d'; ctx.font = '700 ' + timeFontSize + 'px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif'; ctx.fillText(start + '～' + end, 420, y); }
         else { ctx.fillStyle = '#a16f82'; ctx.font = '600 ' + Math.max(14, timeFontSize - 8) + 'px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif'; ctx.fillText('開始・終了時間を入力してください', 420, y); }
       }
       function drawFullStatus(y, statusFontSize) {
-        drawStatusText('満', y, statusFontSize);
+        drawStatusEmoji('🈵', y, statusFontSize);
       }
-      function drawStatusText(status, y, statusFontSize) {
+      function drawStatusEmoji(emoji, y, statusFontSize) {
         ctx.save();
-        ctx.font = '700 ' + statusFontSize + 'px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif';
+        ctx.font = statusFontSize + 'px "Apple Color Emoji", "Segoe UI Emoji", sans-serif';
         ctx.textBaseline = 'alphabetic';
-        ctx.fillStyle = status === '満' ? '#e45043' : '#2183cf';
-        ctx.fillText(status, 330, y);
+        ctx.fillText(emoji, 330, y);
         ctx.restore();
       }
       function requestDraw() {
