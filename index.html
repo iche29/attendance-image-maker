@@ -179,7 +179,7 @@
       }
       function createDefaultDays(savedDays) {
         return WEEKDAYS.map((label, index) => {
-          const fallback = { label, status: index < 5 ? '空' : '休み', visible: index < 5, slots: [{ start: '09:00', end: '18:00' }] };
+          const fallback = { label, status: '空', visible: index < 5, slots: [{ start: '09:00', end: '18:00' }] };
           const savedDay = savedDays && savedDays.find(day => day && day.label === label) || savedDays && savedDays[index];
           return savedDay ? normalizeDay(savedDay, fallback) : fallback;
         });
