@@ -338,14 +338,14 @@
       function drawPreview() {
         ctx.clearRect(0, 0, 1080, 1080);
         drawTiledBackground();
-        const displayRows = [];
-        getDisplayDays().forEach(({ day, dayIndex, label }) => {
-          if (day.status === '満' || day.status === '休み') displayRows.push({ day, dayIndex, label, message: day.status === '満' ? '満枠ありがとう' : 'お休み', firstOfDay: true });
-          else if (state.slotLayoutMode === 'compact') {
-            day.slots.forEach((slot, slotIndex) => displayRows.push({ day, dayIndex, label, slot, firstOfDay: slotIndex === 0, showDay: slotIndex === 0 }));
-          }
-          else day.slots.forEach((slot, slotIndex) => displayRows.push({ day, dayIndex, label, slot, firstOfDay: slotIndex === 0, showDay: true }));
-        });
+        let rowCount = Math.max(1, getDisplayDays().reduce((count, { day }) => count + (day.status === '空' ? day.slots.length : 1), 0));
+        let displayRows = [];
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          const estimatedTimeFontSize = Math.min(45, Math.max(16, Math.round(Math.min(120, Math.max(30, Math.floor(760 / rowCount))) * .40)));
+          displayRows = buildDisplayRows(estimatedTimeFontSize);
+          if (displayRows.length === rowCount) break;
+          rowCount = displayRows.length;
+        }
         const rowHeight = Math.min(120, Math.max(30, Math.floor(760 / displayRows.length)));
         const contentHeight = rowHeight * displayRows.length;
         const panelHeight = Math.min(960, contentHeight + 120);
@@ -361,9 +361,42 @@
           if (row.dayIndex > 0 && row.firstOfDay) { ctx.save(); ctx.setLineDash([4, 12]); ctx.strokeStyle = 'rgba(221, 152, 178, .52)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(150, y - rowHeight / 2); ctx.lineTo(930, y - rowHeight / 2); ctx.stroke(); ctx.restore(); }
           if (row.showDay || row.message) { ctx.fillStyle = '#6f5264'; ctx.font = '700 ' + dayFontSize + 'px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif'; ctx.fillText(row.label, 150, y); }
           if (row.message) drawStatusMessage(row.day.status, row.message, y, dayFontSize, timeFontSize);
+          else if (row.compactSlots) drawCompactSlots(row.compactSlots, y, dayFontSize, timeFontSize);
           else drawSlot(row.slot, y, dayFontSize, timeFontSize);
           y += rowHeight;
         });
+      }
+      function buildDisplayRows(timeFontSize) {
+        const rows = [];
+        getDisplayDays().forEach(({ day, dayIndex, label }) => {
+          if (day.status === '満' || day.status === '休み') {
+            rows.push({ day, dayIndex, label, message: day.status === '満' ? '満枠ありがとう' : 'お休み', firstOfDay: true });
+            return;
+          }
+          if (state.slotLayoutMode !== 'compact') {
+            day.slots.forEach((slot, slotIndex) => rows.push({ day, dayIndex, label, slot, firstOfDay: slotIndex === 0, showDay: true }));
+            return;
+          }
+          ctx.save();
+          ctx.font = '700 ' + timeFontSize + 'px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif';
+          const separatorWidth = ctx.measureText(' / ').width;
+          let compactSlots = [];
+          let usedWidth = 0;
+          day.slots.forEach(slot => {
+            const text = formatTime(slot.start) && formatTime(slot.end) ? formatTime(slot.start) + '～' + formatTime(slot.end) : '開始・終了時間を入力してください';
+            const slotWidth = 64 + ctx.measureText(text).width;
+            if (compactSlots.length && usedWidth + separatorWidth + slotWidth > 510) {
+              rows.push({ day, dayIndex, label, compactSlots, firstOfDay: rows.length === 0 || rows[rows.length - 1].dayIndex !== dayIndex, showDay: rows.length === 0 || rows[rows.length - 1].dayIndex !== dayIndex });
+              compactSlots = [];
+              usedWidth = 0;
+            }
+            compactSlots.push(slot);
+            usedWidth += (compactSlots.length > 1 ? separatorWidth : 0) + slotWidth;
+          });
+          if (compactSlots.length) rows.push({ day, dayIndex, label, compactSlots, firstOfDay: rows.length === 0 || rows[rows.length - 1].dayIndex !== dayIndex, showDay: rows.length === 0 || rows[rows.length - 1].dayIndex !== dayIndex });
+          ctx.restore();
+        });
+        return rows;
       }
       function drawSlot(slot, y, statusFontSize, timeFontSize) {
         drawStatusEmoji('🈳', y, statusFontSize);
@@ -371,17 +404,35 @@
         if (start && end) { ctx.fillStyle = '#42303d'; ctx.font = '700 ' + timeFontSize + 'px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif'; ctx.fillText(start + '～' + end, 420, y); }
         else { ctx.fillStyle = '#a16f82'; ctx.font = '600 ' + Math.max(14, timeFontSize - 8) + 'px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif'; ctx.fillText('開始・終了時間を入力してください', 420, y); }
       }
+      function drawCompactSlots(slots, y, statusFontSize, timeFontSize) {
+        let x = 330;
+        ctx.save();
+        ctx.font = '700 ' + timeFontSize + 'px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif';
+        const separatorWidth = ctx.measureText(' / ').width;
+        ctx.restore();
+        slots.forEach((slot, index) => {
+          if (index > 0) { ctx.fillStyle = '#876f7c'; ctx.font = '600 ' + Math.max(14, timeFontSize - 6) + 'px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif'; ctx.fillText('/', x, y); x += separatorWidth; }
+          drawStatusEmoji('🈳', y, statusFontSize, x);
+          x += 50;
+          const start = formatTime(slot.start), end = formatTime(slot.end);
+          const text = start && end ? start + '～' + end : '開始・終了時間を入力してください';
+          ctx.fillStyle = start && end ? '#42303d' : '#a16f82';
+          ctx.font = (start && end ? '700 ' + timeFontSize : '600 ' + Math.max(14, timeFontSize - 8)) + 'px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif';
+          ctx.fillText(text, x, y);
+          x += ctx.measureText(text).width + 14;
+        });
+      }
       function drawStatusMessage(status, message, y, statusFontSize, messageFontSize) {
         drawStatusEmoji(status === '満' ? '🈵' : '🌙', y, statusFontSize);
         ctx.fillStyle = status === '満' ? '#b74b5a' : '#746775';
         ctx.font = '700 ' + messageFontSize + 'px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif';
         ctx.fillText(message, 420, y);
       }
-      function drawStatusEmoji(emoji, y, statusFontSize) {
+      function drawStatusEmoji(emoji, y, statusFontSize, x = 330) {
         ctx.save();
         ctx.font = statusFontSize + 'px "Apple Color Emoji", "Segoe UI Emoji", sans-serif';
         ctx.textBaseline = 'middle';
-        ctx.fillText(emoji, 330, y);
+        ctx.fillText(emoji, x, y);
         ctx.restore();
       }
       function requestDraw() {
