@@ -282,15 +282,17 @@
           else if (state.slotLayoutMode === 'compact') displayRows.push({ day, dayIndex, slots: day.slots, firstOfDay: true });
           else day.slots.forEach((slot, slotIndex) => displayRows.push({ day, dayIndex, slot, firstOfDay: slotIndex === 0 }));
         });
-        const panel = { x: 76, y: 80, width: 928, height: 920, radius: 48 };
+        const rowHeight = Math.min(120, Math.max(30, Math.floor(760 / displayRows.length)));
+        const contentHeight = rowHeight * displayRows.length;
+        const panelHeight = Math.min(960, contentHeight + 120);
+        const panel = { x: 76, y: (1080 - panelHeight) / 2, width: 928, height: panelHeight, radius: 48 };
         roundedRect(panel.x, panel.y, panel.width, panel.height, panel.radius);
         ctx.fillStyle = 'rgba(255, 255, 255, .82)'; ctx.fill();
         if (state.showBorder) { ctx.strokeStyle = 'rgba(239, 143, 177, .72)'; ctx.lineWidth = 4; ctx.stroke(); }
         ctx.textBaseline = 'middle';
-        const rowHeight = Math.min(120, Math.max(30, Math.floor(760 / displayRows.length)));
         const dayFontSize = Math.min(34, Math.max(14, Math.round(rowHeight * .31)));
         const timeFontSize = Math.min(45, Math.max(16, Math.round(rowHeight * .40)));
-        let y = 150;
+        let y = panel.y + 60 + rowHeight / 2;
         displayRows.forEach((row, rowIndex) => {
           if (row.dayIndex > 0 && row.firstOfDay) { ctx.save(); ctx.setLineDash([4, 12]); ctx.strokeStyle = 'rgba(221, 152, 178, .52)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(150, y - rowHeight / 2); ctx.lineTo(930, y - rowHeight / 2); ctx.stroke(); ctx.restore(); }
           if (row.firstOfDay) { ctx.fillStyle = '#6f5264'; ctx.font = '700 ' + dayFontSize + 'px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif'; ctx.fillText(row.day.label, 150, y); }
