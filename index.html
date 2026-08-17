@@ -19,7 +19,7 @@
     .field-label { display: block; font-size: .88rem; font-weight: 700; margin-bottom: 7px; }
     .upload { display: grid; gap: 8px; margin-bottom: 22px; }
     input, select, button { font: inherit; }
-    input[type="file"], input[type="time"], select { width: 100%; min-height: 42px; border: 1px solid #e9cdd7; border-radius: 10px; padding: 8px 10px; background: #fff; color: var(--ink); }
+    input[type="file"], input[type="time"], select { width: 100%; min-width: 0; max-width: 100%; min-height: 42px; border: 1px solid #e9cdd7; border-radius: 10px; padding: 8px 10px; background: #fff; color: var(--ink); }
     .hint { margin: 0; color: #876f7c; font-size: .78rem; line-height: 1.55; }
     .border-toggle { display: flex; align-items: center; gap: 9px; margin: 0 0 18px; font-size: .92rem; }
     .border-toggle input { width: 18px; height: 18px; accent-color: var(--pink); }
@@ -92,14 +92,14 @@
   <script>
     (() => {
       'use strict';
-      const STORAGE_KEY = 'attendance-image-maker-v2';
+      const STORAGE_KEY = 'attendance-image-maker-v3';
       const MAX_SLOTS_PER_DAY = 5;
       const DAYS = [
-        { label: '月曜日', slots: [{ state: '空', start: '09:00', end: '18:00' }] },
-        { label: '火曜日', slots: [{ state: '空', start: '09:00', end: '18:00' }] },
-        { label: '水曜日', slots: [{ state: '空', start: '09:00', end: '18:00' }] },
-        { label: '木曜日', slots: [{ state: '空', start: '09:00', end: '18:00' }] },
-        { label: '金曜日', slots: [{ state: '空', start: '09:00', end: '18:00' }] }
+        { label: '月曜日', status: '空', slots: [{ start: '09:00', end: '18:00' }] },
+        { label: '火曜日', status: '空', slots: [{ start: '09:00', end: '18:00' }] },
+        { label: '水曜日', status: '空', slots: [{ start: '09:00', end: '18:00' }] },
+        { label: '木曜日', status: '空', slots: [{ start: '09:00', end: '18:00' }] },
+        { label: '金曜日', status: '空', slots: [{ start: '09:00', end: '18:00' }] }
       ];
       const canvas = document.querySelector('#preview');
       const ctx = canvas.getContext('2d');
@@ -118,37 +118,37 @@
 
       function loadState() {
         try {
-          const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || localStorage.getItem('attendance-image-maker-v1'));
+          const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || localStorage.getItem('attendance-image-maker-v2') || localStorage.getItem('attendance-image-maker-v1'));
           if (saved && Array.isArray(saved.days) && saved.days.length === DAYS.length) {
             return {
-              days: saved.days.map((day, index) => ({
-                ...DAYS[index],
-                slots: Array.isArray(day && day.slots) && day.slots.length
-                  ? day.slots.slice(0, MAX_SLOTS_PER_DAY).map(slot => normalizeSlot(slot))
-                  : [normalizeSlot(day && day.state ? day : DAYS[index].slots[0])]
-              })),
+              days: saved.days.map((day, index) => normalizeDay(day, DAYS[index])),
               showBorder: saved.showBorder !== false,
               backgroundMode: ['tile', 'cover', 'center'].includes(saved.backgroundMode) ? saved.backgroundMode : 'tile',
               slotLayoutMode: saved.slotLayoutMode === 'compact' ? 'compact' : 'separate'
             };
           }
         } catch (_) { /* 保存内容が壊れている場合は初期値を使う */ }
-        return { days: DAYS.map(day => ({ label: day.label, slots: day.slots.map(slot => ({ ...slot })) })), showBorder: true, backgroundMode: 'tile', slotLayoutMode: 'separate' };
+        return { days: createDefaultDays(), showBorder: true, backgroundMode: 'tile', slotLayoutMode: 'separate' };
       }
       function isTime(value) { return typeof value === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(value); }
       function normalizeSlot(slot) {
-        const stateValue = slot && slot.state === '満' ? '満' : '空';
         return {
-          state: stateValue,
-          start: stateValue === '空' && isTime(slot && slot.start) ? slot.start : '09:00',
-          end: stateValue === '空' && isTime(slot && slot.end) ? slot.end : '18:00'
+          start: isTime(slot && slot.start) ? slot.start : '09:00',
+          end: isTime(slot && slot.end) ? slot.end : '18:00'
         };
+      }
+      function normalizeDay(day, fallback) {
+        const legacySlots = Array.isArray(day && day.slots) ? day.slots : (day && (day.start || day.end) ? [day] : []);
+        const status = day && (day.status === '満' || day.state === '満') ? '満'
+          : legacySlots.length && legacySlots.every(slot => slot && slot.state === '満') ? '満' : '空';
+        const availableSlots = legacySlots.filter(slot => !slot || slot.state !== '満').slice(0, MAX_SLOTS_PER_DAY).map(slot => normalizeSlot(slot));
+        return { label: fallback.label, status, slots: status === '満' ? [] : (availableSlots.length ? availableSlots : fallback.slots.map(slot => ({ ...slot }))) };
       }
       function saveState() {
         try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ days: state.days, showBorder: state.showBorder, backgroundMode: state.backgroundMode, slotLayoutMode: state.slotLayoutMode })); }
         catch (_) { /* 保存できなくてもプレビューとPNG生成は継続する */ }
       }
-      function createDefaultDays() { return DAYS.map(day => ({ label: day.label, slots: day.slots.map(slot => ({ ...slot })) })); }
+      function createDefaultDays() { return DAYS.map(day => ({ label: day.label, status: day.status, slots: day.slots.map(slot => ({ ...slot })) })); }
       function makeFields() {
         fields.replaceChildren(...state.days.map((day, index) => {
           const row = document.createElement('div');
@@ -157,6 +157,14 @@
           title.className = 'day-name';
           title.textContent = day.label;
           row.append(title);
+          row.append(makeDayStatusField(index, day.status));
+          if (day.status === '満') {
+            const fullMessage = document.createElement('p');
+            fullMessage.className = 'hint';
+            fullMessage.textContent = 'この曜日は満枠です。時間帯は入力しません。';
+            row.append(fullMessage);
+            return row;
+          }
           const slotList = document.createElement('div');
           slotList.className = 'slot-list';
           day.slots.forEach((slot, slotIndex) => slotList.append(makeSlotField(index, slotIndex, slot)));
@@ -172,6 +180,19 @@
           }
           return row;
         }));
+      }
+      function makeDayStatusField(dayIndex, status) {
+        const label = document.createElement('label');
+        label.className = 'state-field';
+        label.append('状態');
+        const select = document.createElement('select');
+        select.dataset.dayIndex = String(dayIndex);
+        select.dataset.field = 'status';
+        select.add(new Option('空', '空'));
+        select.add(new Option('満', '満'));
+        select.value = status;
+        label.append(select);
+        return label;
       }
       function makeSlotField(dayIndex, slotIndex, slot) {
         const card = document.createElement('section');
@@ -192,20 +213,8 @@
           header.append(removeButton);
         }
         card.append(header);
-        const stateLabel = document.createElement('label');
-        stateLabel.className = 'state-field';
-        stateLabel.append('状態');
-        const select = document.createElement('select');
-        select.dataset.dayIndex = String(dayIndex);
-        select.dataset.slotIndex = String(slotIndex);
-        select.dataset.field = 'state';
-        select.add(new Option('空', '空'));
-        select.add(new Option('満', '満'));
-        select.value = slot.state;
-        stateLabel.append(select);
-        card.append(stateLabel);
         const timeFields = document.createElement('div');
-        timeFields.className = 'time-fields' + (slot.state === '満' ? ' is-hidden' : '');
+        timeFields.className = 'time-fields';
         timeFields.append(makeTimeField('開始時間', dayIndex, slotIndex, 'start', slot.start));
         timeFields.append(makeTimeField('終了時間', dayIndex, slotIndex, 'end', slot.end));
         card.append(timeFields);
@@ -269,7 +278,8 @@
         drawTiledBackground();
         const displayRows = [];
         state.days.forEach((day, dayIndex) => {
-          if (state.slotLayoutMode === 'compact') displayRows.push({ day, dayIndex, slots: day.slots, firstOfDay: true });
+          if (day.status === '満') displayRows.push({ day, dayIndex, full: true, firstOfDay: true });
+          else if (state.slotLayoutMode === 'compact') displayRows.push({ day, dayIndex, slots: day.slots, firstOfDay: true });
           else day.slots.forEach((slot, slotIndex) => displayRows.push({ day, dayIndex, slot, firstOfDay: slotIndex === 0 }));
         });
         const panel = { x: 76, y: 80, width: 928, height: 920, radius: 48 };
@@ -284,22 +294,25 @@
         displayRows.forEach((row, rowIndex) => {
           if (row.dayIndex > 0 && row.firstOfDay) { ctx.save(); ctx.setLineDash([4, 12]); ctx.strokeStyle = 'rgba(221, 152, 178, .52)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(150, y - rowHeight / 2); ctx.lineTo(930, y - rowHeight / 2); ctx.stroke(); ctx.restore(); }
           if (row.firstOfDay) { ctx.fillStyle = '#6f5264'; ctx.font = '700 ' + dayFontSize + 'px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif'; ctx.fillText(row.day.label, 150, y); }
-          if (state.slotLayoutMode === 'compact') drawCompactSlots(row.slots, y, timeFontSize);
+          if (row.full) drawFullStatus(y, dayFontSize);
+          else if (state.slotLayoutMode === 'compact') drawCompactSlots(row.slots, y, timeFontSize);
           else drawSlot(row.slot, y, dayFontSize, timeFontSize);
           y += rowHeight;
         });
       }
       function drawSlot(slot, y, statusFontSize, timeFontSize) {
         ctx.font = statusFontSize + 'px "Apple Color Emoji", "Segoe UI Emoji", sans-serif';
-        ctx.fillText(slot.state === '空' ? '🈳' : '🈵', 380, y);
-        if (slot.state !== '空') return;
+        ctx.fillText('🈳', 380, y);
         const start = formatTime(slot.start), end = formatTime(slot.end);
         if (start && end) { ctx.fillStyle = '#42303d'; ctx.font = '700 ' + timeFontSize + 'px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif'; ctx.fillText(start + '～' + end, 470, y); }
         else { ctx.fillStyle = '#a16f82'; ctx.font = '600 ' + Math.max(14, timeFontSize - 8) + 'px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif'; ctx.fillText('開始・終了時間を入力してください', 470, y); }
       }
+      function drawFullStatus(y, statusFontSize) {
+        ctx.font = statusFontSize + 'px "Apple Color Emoji", "Segoe UI Emoji", sans-serif';
+        ctx.fillText('🈵', 380, y);
+      }
       function drawCompactSlots(slots, y, baseFontSize) {
         const summary = slots.map(slot => {
-          if (slot.state === '満') return '🈵';
           const start = formatTime(slot.start), end = formatTime(slot.end);
           return start && end ? '🈳 ' + start + '～' + end : '🈳 時間未入力';
         }).join('  /  ');
@@ -317,7 +330,7 @@
         drawQueued = true;
         requestAnimationFrame(() => { drawQueued = false; drawPreview(); });
       }
-      function hasIncompleteTime() { return state.days.some(day => day.slots.some(slot => slot.state === '空' && (!isTime(slot.start) || !isTime(slot.end)))); }
+      function hasIncompleteTime() { return state.days.some(day => day.status === '空' && day.slots.some(slot => !isTime(slot.start) || !isTime(slot.end))); }
       function updateSaveState() {
         const incomplete = hasIncompleteTime();
         saveButton.disabled = incomplete;
@@ -328,9 +341,12 @@
         const dayIndex = Number(target.dataset.dayIndex);
         const slotIndex = Number(target.dataset.slotIndex);
         const field = target.dataset.field;
-        if (!Number.isInteger(dayIndex) || !Number.isInteger(slotIndex) || !field) return;
-        state.days[dayIndex].slots[slotIndex][field] = target.value;
-        if (field === 'state') makeFields();
+        if (!Number.isInteger(dayIndex) || !field) return;
+        if (field === 'status') {
+          state.days[dayIndex].status = target.value;
+          if (target.value === '空' && state.days[dayIndex].slots.length === 0) state.days[dayIndex].slots.push({ start: '09:00', end: '18:00' });
+          makeFields();
+        } else if (Number.isInteger(slotIndex)) state.days[dayIndex].slots[slotIndex][field] = target.value;
         saveState(); requestDraw(); updateSaveState();
       }
       fields.addEventListener('input', updateDay);
@@ -341,7 +357,7 @@
         const dayIndex = Number(button.dataset.dayIndex);
         if (!Number.isInteger(dayIndex)) return;
         const slots = state.days[dayIndex].slots;
-        if (button.dataset.action === 'add-slot' && slots.length < MAX_SLOTS_PER_DAY) slots.push({ state: '空', start: '09:00', end: '18:00' });
+        if (button.dataset.action === 'add-slot' && slots.length < MAX_SLOTS_PER_DAY) slots.push({ start: '09:00', end: '18:00' });
         if (button.dataset.action === 'remove-slot') {
           const slotIndex = Number(button.dataset.slotIndex);
           if (Number.isInteger(slotIndex) && slotIndex > 0) slots.splice(slotIndex, 1);
