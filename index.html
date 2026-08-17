@@ -285,14 +285,18 @@
       function makeTimeField(labelText, dayIndex, slotIndex, field, value) {
         const label = document.createElement('label');
         label.append(labelText);
-        const input = document.createElement('input');
-        input.type = 'time';
-        input.step = '600';
-        input.value = value;
-        input.dataset.dayIndex = String(dayIndex);
-        input.dataset.slotIndex = String(slotIndex);
-        input.dataset.field = field;
-        label.append(input);
+        const select = document.createElement('select');
+        for (let hour = 0; hour < 24; hour += 1) {
+          for (let minute = 0; minute < 60; minute += 10) {
+            const time = String(hour).padStart(2, '0') + ':' + String(minute).padStart(2, '0');
+            select.add(new Option(time, time));
+          }
+        }
+        select.value = value;
+        select.dataset.dayIndex = String(dayIndex);
+        select.dataset.slotIndex = String(slotIndex);
+        select.dataset.field = field;
+        label.append(select);
         return label;
       }
       function formatTime(value) {
