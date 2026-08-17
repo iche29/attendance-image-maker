@@ -323,44 +323,21 @@
         });
       }
       function drawSlot(slot, y, statusFontSize, timeFontSize) {
-        drawStatusBadge('空', y, statusFontSize);
+        drawStatusEmoji('🈳', y, statusFontSize);
         const start = formatTime(slot.start), end = formatTime(slot.end);
         if (start && end) { ctx.fillStyle = '#42303d'; ctx.font = '700 ' + timeFontSize + 'px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif'; ctx.fillText(start + '～' + end, 420, y); }
         else { ctx.fillStyle = '#a16f82'; ctx.font = '600 ' + Math.max(14, timeFontSize - 8) + 'px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif'; ctx.fillText('開始・終了時間を入力してください', 420, y); }
       }
       function drawFullStatus(y, statusFontSize) {
-        drawStatusBadge('満', y, statusFontSize);
+        drawStatusEmoji('🈵', y, statusFontSize);
       }
-      function drawStatusBadge(status, y, statusFontSize) {
-        const fontSize = Math.max(26, Math.min(38, statusFontSize));
-        const paddingX = Math.round(fontSize * .34);
-        const paddingY = Math.round(fontSize * .16);
+      function drawStatusEmoji(emoji, y, statusFontSize) {
+        const fontSize = Math.max(30, Math.min(42, statusFontSize));
         ctx.save();
-        ctx.font = '800 ' + fontSize + 'px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif';
+        ctx.font = fontSize + 'px "Apple Color Emoji", "Segoe UI Emoji", sans-serif';
         ctx.textBaseline = 'alphabetic';
-        const metrics = ctx.measureText(status);
-        const ascent = metrics.actualBoundingBoxAscent || Math.round(fontSize * .8);
-        const descent = metrics.actualBoundingBoxDescent || Math.round(fontSize * .2);
-        const width = Math.ceil(metrics.width + paddingX * 2);
-        const height = Math.ceil(ascent + descent + paddingY * 2);
-        const x = 330;
-        const top = Math.round(y - ascent - paddingY);
-        const radius = Math.round(height * .22);
-        ctx.fillStyle = status === '満' ? '#ef5a47' : '#258de2';
-        ctx.beginPath();
-        ctx.moveTo(x + radius, top);
-        ctx.lineTo(x + width - radius, top);
-        ctx.quadraticCurveTo(x + width, top, x + width, top + radius);
-        ctx.lineTo(x + width, top + height - radius);
-        ctx.quadraticCurveTo(x + width, top + height, x + width - radius, top + height);
-        ctx.lineTo(x + radius, top + height);
-        ctx.quadraticCurveTo(x, top + height, x, top + height - radius);
-        ctx.lineTo(x, top + radius);
-        ctx.quadraticCurveTo(x, top, x + radius, top);
-        ctx.fill();
-        ctx.fillStyle = '#fff';
         ctx.textAlign = 'center';
-        ctx.fillText(status, x + width / 2, y);
+        ctx.fillText(emoji, 352, y);
         ctx.restore();
       }
       function requestDraw() {
