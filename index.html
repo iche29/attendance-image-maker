@@ -24,12 +24,14 @@
     .border-toggle { display: flex; align-items: center; gap: 9px; margin: 0 0 18px; font-size: .92rem; }
     .border-toggle input { width: 18px; height: 18px; accent-color: var(--pink); }
     .schedule-fields { display: grid; gap: 12px; }
-    .day-field { padding: 13px; background: var(--pink-soft); border-radius: 14px; }
-    .day-top, .time-fields { display: grid; align-items: end; gap: 9px; }
-    .day-top { grid-template-columns: 55px 1fr; }
-    .day-name { padding-bottom: 10px; font-weight: 800; }
-    .time-fields { grid-template-columns: 1fr 1fr; margin-top: 10px; }
-    .time-fields label { display: grid; gap: 5px; font-size: .78rem; font-weight: 700; }
+    .day-field { padding: 16px; background: var(--pink-soft); border-radius: 14px; }
+    .day-name { display: block; margin: 0 0 11px; font-size: 1.12rem; font-weight: 800; }
+    .slot-list { display: grid; gap: 10px; }
+    .slot-card { padding: 12px; border: 1px solid rgba(239, 143, 177, .35); border-radius: 12px; background: rgba(255, 255, 255, .56); }
+    .slot-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: .84rem; font-weight: 800; }
+    .state-field { display: grid; gap: 5px; font-size: .78rem; font-weight: 700; }
+    .time-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: end; gap: 9px; margin-top: 10px; }
+    .time-fields label { display: grid; min-width: 0; gap: 5px; font-size: .78rem; font-weight: 700; }
     .time-fields.is-hidden { display: none; }
     .preview-card { padding: 18px; }
     .preview-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 0 0 13px; }
@@ -37,11 +39,16 @@
     .canvas-wrap { overflow: hidden; border-radius: 15px; background: #eee; box-shadow: 0 5px 16px rgba(50, 32, 44, .12); }
     canvas { display: block; width: 100%; height: auto; aspect-ratio: 1; }
     .save-row { margin-top: 16px; }
-    button { width: 100%; min-height: 50px; border: 0; border-radius: 999px; cursor: pointer; background: linear-gradient(135deg, #ef86ac, #d874a1); color: white; font-weight: 800; box-shadow: 0 7px 14px rgba(202, 87, 137, .25); }
-    button:hover:not(:disabled) { filter: brightness(1.03); }
-    button:disabled { cursor: not-allowed; opacity: .55; box-shadow: none; }
+    button { font: inherit; }
+    .save-row button { width: 100%; min-height: 50px; border: 0; border-radius: 999px; cursor: pointer; background: linear-gradient(135deg, #ef86ac, #d874a1); color: white; font-weight: 800; box-shadow: 0 7px 14px rgba(202, 87, 137, .25); }
+    .save-row button:hover:not(:disabled) { filter: brightness(1.03); }
+    .save-row button:disabled { cursor: not-allowed; opacity: .55; box-shadow: none; }
+    .add-slot-button, .remove-slot-button { min-height: 34px; border: 1px solid #e9a8bf; border-radius: 9px; cursor: pointer; font-size: .82rem; font-weight: 700; }
+    .add-slot-button { width: 100%; margin-top: 10px; color: #b64f78; background: #fff; }
+    .remove-slot-button { padding: 4px 9px; color: #9c5e72; background: transparent; }
     button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid rgba(239, 143, 177, .42); outline-offset: 2px; }
     @media (max-width: 760px) { .app { padding: 22px 14px 36px; } .layout { grid-template-columns: 1fr; gap: 20px; } .preview-card { order: 2; } .controls { order: 1; } }
+    @media (max-width: 480px) { .time-fields { grid-template-columns: 1fr; gap: 10px; } }
   </style>
 </head>
 <body>
@@ -57,6 +64,17 @@
           <input id="backgroundInput" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif">
           <p class="hint">画像はこの端末のブラウザ内だけで使います。小さい画像はタイル状に繰り返します。</p>
           <p id="backgroundMessage" class="hint" role="status" aria-live="polite"></p>
+          <label class="field-label" for="backgroundMode">背景の表示</label>
+          <select id="backgroundMode">
+            <option value="tile">繰り返し（元画像サイズ）</option>
+            <option value="cover">全面表示</option>
+            <option value="center">中央配置</option>
+          </select>
+          <label class="field-label" for="slotLayoutMode">複数枠の表示</label>
+          <select id="slotLayoutMode">
+            <option value="separate">枠ごとに行を分ける</option>
+            <option value="compact">曜日ごとに1行へまとめる</option>
+          </select>
         </div>
         <label class="border-toggle"><input id="borderToggle" type="checkbox" checked> パネルにピンクの枠線を付ける</label>
         <h2>平日の出勤予定</h2>
@@ -72,19 +90,22 @@
   <script>
     (() => {
       'use strict';
-      const STORAGE_KEY = 'attendance-image-maker-v1';
+      const STORAGE_KEY = 'attendance-image-maker-v2';
+      const MAX_SLOTS_PER_DAY = 5;
       const DAYS = [
-        { label: '月曜日', state: '空', start: '10:30', end: '11:30' },
-        { label: '火曜日', state: '満', start: '10:30', end: '11:30' },
-        { label: '水曜日', state: '空', start: '09:30', end: '13:00' },
-        { label: '木曜日', state: '空', start: '09:30', end: '13:00' },
-        { label: '金曜日', state: '空', start: '09:30', end: '11:00' }
+        { label: '月曜日', slots: [{ state: '空', start: '09:00', end: '18:00' }] },
+        { label: '火曜日', slots: [{ state: '空', start: '09:00', end: '18:00' }] },
+        { label: '水曜日', slots: [{ state: '空', start: '09:00', end: '18:00' }] },
+        { label: '木曜日', slots: [{ state: '空', start: '09:00', end: '18:00' }] },
+        { label: '金曜日', slots: [{ state: '空', start: '09:00', end: '18:00' }] }
       ];
       const canvas = document.querySelector('#preview');
       const ctx = canvas.getContext('2d');
       const fields = document.querySelector('#scheduleFields');
       const backgroundInput = document.querySelector('#backgroundInput');
       const backgroundMessage = document.querySelector('#backgroundMessage');
+      const backgroundModeInput = document.querySelector('#backgroundMode');
+      const slotLayoutModeInput = document.querySelector('#slotLayoutMode');
       const borderToggle = document.querySelector('#borderToggle');
       const saveButton = document.querySelector('#saveButton');
       let backgroundImage = null;
@@ -94,39 +115,109 @@
 
       function loadState() {
         try {
-          const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+          const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || localStorage.getItem('attendance-image-maker-v1'));
           if (saved && Array.isArray(saved.days) && saved.days.length === DAYS.length) {
             return {
               days: saved.days.map((day, index) => ({
                 ...DAYS[index],
-                state: day && day.state === '満' ? '満' : '空',
-                start: isTime(day && day.start) ? day.start : DAYS[index].start,
-                end: isTime(day && day.end) ? day.end : DAYS[index].end
+                slots: Array.isArray(day && day.slots) && day.slots.length
+                  ? day.slots.slice(0, MAX_SLOTS_PER_DAY).map(slot => normalizeSlot(slot))
+                  : [normalizeSlot(day && day.state ? day : DAYS[index].slots[0])]
               })),
-              showBorder: saved.showBorder !== false
+              showBorder: saved.showBorder !== false,
+              backgroundMode: ['tile', 'cover', 'center'].includes(saved.backgroundMode) ? saved.backgroundMode : 'tile',
+              slotLayoutMode: saved.slotLayoutMode === 'compact' ? 'compact' : 'separate'
             };
           }
         } catch (_) { /* 保存内容が壊れている場合は初期値を使う */ }
-        return { days: DAYS.map(day => ({ ...day })), showBorder: true };
+        return { days: DAYS.map(day => ({ label: day.label, slots: day.slots.map(slot => ({ ...slot })) })), showBorder: true, backgroundMode: 'tile', slotLayoutMode: 'separate' };
       }
-      function isTime(value) { return typeof value === 'string' && /^([01]\\d|2[0-3]):[0-5]\\d$/.test(value); }
+      function isTime(value) { return typeof value === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(value); }
+      function normalizeSlot(slot) {
+        const stateValue = slot && slot.state === '満' ? '満' : '空';
+        return {
+          state: stateValue,
+          start: stateValue === '空' && isTime(slot && slot.start) ? slot.start : '09:00',
+          end: stateValue === '空' && isTime(slot && slot.end) ? slot.end : '18:00'
+        };
+      }
       function saveState() {
-        try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ days: state.days, showBorder: state.showBorder })); }
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ days: state.days, showBorder: state.showBorder, backgroundMode: state.backgroundMode, slotLayoutMode: state.slotLayoutMode })); }
         catch (_) { /* 保存できなくてもプレビューとPNG生成は継続する */ }
       }
       function makeFields() {
         fields.replaceChildren(...state.days.map((day, index) => {
           const row = document.createElement('div');
           row.className = 'day-field';
-          row.innerHTML = `
-            <div class="day-top"><span class="day-name">${day.label}</span><label><span class="field-label">状態</span><select data-index="${index}" data-field="state"><option value="空">空</option><option value="満">満</option></select></label></div>
-            <div class="time-fields"><label>開始時間<input type="time" data-index="${index}" data-field="start"></label><label>終了時間<input type="time" data-index="${index}" data-field="end"></label></div>`;
-          row.querySelector('select').value = day.state;
-          row.querySelector('[data-field="start"]').value = day.start;
-          row.querySelector('[data-field="end"]').value = day.end;
-          row.querySelector('.time-fields').classList.toggle('is-hidden', day.state === '満');
+          const title = document.createElement('h3');
+          title.className = 'day-name';
+          title.textContent = day.label;
+          row.append(title);
+          const slotList = document.createElement('div');
+          slotList.className = 'slot-list';
+          day.slots.forEach((slot, slotIndex) => slotList.append(makeSlotField(index, slotIndex, slot)));
+          row.append(slotList);
+          if (day.slots.length < MAX_SLOTS_PER_DAY) {
+            const addButton = document.createElement('button');
+            addButton.className = 'add-slot-button';
+            addButton.type = 'button';
+            addButton.dataset.action = 'add-slot';
+            addButton.dataset.dayIndex = String(index);
+            addButton.textContent = '＋ 時間帯を追加';
+            row.append(addButton);
+          }
           return row;
         }));
+      }
+      function makeSlotField(dayIndex, slotIndex, slot) {
+        const card = document.createElement('section');
+        card.className = 'slot-card';
+        const header = document.createElement('div');
+        header.className = 'slot-header';
+        const slotTitle = document.createElement('span');
+        slotTitle.textContent = '出勤枠 ' + (slotIndex + 1);
+        header.append(slotTitle);
+        if (slotIndex > 0) {
+          const removeButton = document.createElement('button');
+          removeButton.className = 'remove-slot-button';
+          removeButton.type = 'button';
+          removeButton.dataset.action = 'remove-slot';
+          removeButton.dataset.dayIndex = String(dayIndex);
+          removeButton.dataset.slotIndex = String(slotIndex);
+          removeButton.textContent = '削除';
+          header.append(removeButton);
+        }
+        card.append(header);
+        const stateLabel = document.createElement('label');
+        stateLabel.className = 'state-field';
+        stateLabel.append('状態');
+        const select = document.createElement('select');
+        select.dataset.dayIndex = String(dayIndex);
+        select.dataset.slotIndex = String(slotIndex);
+        select.dataset.field = 'state';
+        select.add(new Option('空', '空'));
+        select.add(new Option('満', '満'));
+        select.value = slot.state;
+        stateLabel.append(select);
+        card.append(stateLabel);
+        const timeFields = document.createElement('div');
+        timeFields.className = 'time-fields' + (slot.state === '満' ? ' is-hidden' : '');
+        timeFields.append(makeTimeField('開始時間', dayIndex, slotIndex, 'start', slot.start));
+        timeFields.append(makeTimeField('終了時間', dayIndex, slotIndex, 'end', slot.end));
+        card.append(timeFields);
+        return card;
+      }
+      function makeTimeField(labelText, dayIndex, slotIndex, field, value) {
+        const label = document.createElement('label');
+        label.append(labelText);
+        const input = document.createElement('input');
+        input.type = 'time';
+        input.value = value;
+        input.dataset.dayIndex = String(dayIndex);
+        input.dataset.slotIndex = String(slotIndex);
+        input.dataset.field = field;
+        label.append(input);
+        return label;
       }
       function formatTime(value) {
         if (!isTime(value)) return '';
@@ -143,8 +234,21 @@
       }
       function drawTiledBackground() {
         if (!backgroundImage) return drawFallbackBackground();
-        const pattern = ctx.createPattern(backgroundImage, 'repeat');
-        if (pattern) { ctx.fillStyle = pattern; ctx.fillRect(0, 0, 1080, 1080); }
+        const width = backgroundImage.naturalWidth;
+        const height = backgroundImage.naturalHeight;
+        if (state.backgroundMode === 'tile') {
+          const pattern = ctx.createPattern(backgroundImage, 'repeat');
+          if (pattern) { ctx.fillStyle = pattern; ctx.fillRect(0, 0, 1080, 1080); }
+          return;
+        }
+        if (state.backgroundMode === 'cover') {
+          const scale = Math.max(1080 / width, 1080 / height);
+          const drawWidth = width * scale;
+          const drawHeight = height * scale;
+          ctx.drawImage(backgroundImage, (1080 - drawWidth) / 2, (1080 - drawHeight) / 2, drawWidth, drawHeight);
+          return;
+        }
+        ctx.drawImage(backgroundImage, (1080 - width) / 2, (1080 - height) / 2);
       }
       function roundedRect(x, y, width, height, radius) {
         const r = Math.min(radius, width / 2, height / 2);
@@ -159,30 +263,57 @@
       function drawPreview() {
         ctx.clearRect(0, 0, 1080, 1080);
         drawTiledBackground();
-        const panel = { x: 92, y: 160, width: 896, height: 760, radius: 48 };
+        const displayRows = [];
+        state.days.forEach((day, dayIndex) => {
+          if (state.slotLayoutMode === 'compact') displayRows.push({ day, dayIndex, slots: day.slots, firstOfDay: true });
+          else day.slots.forEach((slot, slotIndex) => displayRows.push({ day, dayIndex, slot, firstOfDay: slotIndex === 0 }));
+        });
+        const panel = { x: 76, y: 80, width: 928, height: 920, radius: 48 };
         roundedRect(panel.x, panel.y, panel.width, panel.height, panel.radius);
         ctx.fillStyle = 'rgba(255, 255, 255, .82)'; ctx.fill();
         if (state.showBorder) { ctx.strokeStyle = 'rgba(239, 143, 177, .72)'; ctx.lineWidth = 4; ctx.stroke(); }
         ctx.textBaseline = 'middle';
-        const firstY = 293, rowHeight = 120;
-        state.days.forEach((day, index) => {
-          const y = firstY + index * rowHeight;
-          if (index > 0) { ctx.save(); ctx.setLineDash([4, 12]); ctx.strokeStyle = 'rgba(221, 152, 178, .52)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(180, y - 60); ctx.lineTo(900, y - 60); ctx.stroke(); ctx.restore(); }
-          ctx.fillStyle = '#6f5264'; ctx.font = '700 34px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif'; ctx.fillText(day.label, 188, y);
-          ctx.font = '36px "Apple Color Emoji", "Segoe UI Emoji", sans-serif'; ctx.fillText(day.state === '空' ? '🈳' : '🈵', 410, y);
-          if (day.state === '空') {
-            const start = formatTime(day.start), end = formatTime(day.end);
-            if (start && end) { ctx.fillStyle = '#42303d'; ctx.font = '700 45px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif'; ctx.fillText(`${start}～${end}`, 500, y); }
-            else { ctx.fillStyle = '#a16f82'; ctx.font = '600 29px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif'; ctx.fillText('開始・終了時間を入力してください', 500, y); }
-          }
+        const rowHeight = Math.min(120, Math.max(30, Math.floor(760 / displayRows.length)));
+        const dayFontSize = Math.min(34, Math.max(14, Math.round(rowHeight * .31)));
+        const timeFontSize = Math.min(45, Math.max(16, Math.round(rowHeight * .40)));
+        let y = 150;
+        displayRows.forEach((row, rowIndex) => {
+          if (row.dayIndex > 0 && row.firstOfDay) { ctx.save(); ctx.setLineDash([4, 12]); ctx.strokeStyle = 'rgba(221, 152, 178, .52)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(150, y - rowHeight / 2); ctx.lineTo(930, y - rowHeight / 2); ctx.stroke(); ctx.restore(); }
+          if (row.firstOfDay) { ctx.fillStyle = '#6f5264'; ctx.font = '700 ' + dayFontSize + 'px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif'; ctx.fillText(row.day.label, 150, y); }
+          if (state.slotLayoutMode === 'compact') drawCompactSlots(row.slots, y, timeFontSize);
+          else drawSlot(row.slot, y, dayFontSize, timeFontSize);
+          y += rowHeight;
         });
+      }
+      function drawSlot(slot, y, statusFontSize, timeFontSize) {
+        ctx.font = statusFontSize + 'px "Apple Color Emoji", "Segoe UI Emoji", sans-serif';
+        ctx.fillText(slot.state === '空' ? '🈳' : '🈵', 380, y);
+        if (slot.state !== '空') return;
+        const start = formatTime(slot.start), end = formatTime(slot.end);
+        if (start && end) { ctx.fillStyle = '#42303d'; ctx.font = '700 ' + timeFontSize + 'px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif'; ctx.fillText(start + '～' + end, 470, y); }
+        else { ctx.fillStyle = '#a16f82'; ctx.font = '600 ' + Math.max(14, timeFontSize - 8) + 'px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif'; ctx.fillText('開始・終了時間を入力してください', 470, y); }
+      }
+      function drawCompactSlots(slots, y, baseFontSize) {
+        const summary = slots.map(slot => {
+          if (slot.state === '満') return '🈵';
+          const start = formatTime(slot.start), end = formatTime(slot.end);
+          return start && end ? '🈳 ' + start + '～' + end : '🈳 時間未入力';
+        }).join('  /  ');
+        let fontSize = Math.min(28, Math.max(14, baseFontSize));
+        ctx.fillStyle = '#42303d';
+        do {
+          ctx.font = '700 ' + fontSize + 'px -apple-system, BlinkMacSystemFont, "Apple Color Emoji", "Segoe UI Emoji", "Hiragino Sans", "Yu Gothic", sans-serif';
+          if (ctx.measureText(summary).width <= 570 || fontSize === 14) break;
+          fontSize -= 1;
+        } while (fontSize >= 14);
+        ctx.fillText(summary, 360, y);
       }
       function requestDraw() {
         if (drawQueued) return;
         drawQueued = true;
         requestAnimationFrame(() => { drawQueued = false; drawPreview(); });
       }
-      function hasIncompleteTime() { return state.days.some(day => day.state === '空' && (!isTime(day.start) || !isTime(day.end))); }
+      function hasIncompleteTime() { return state.days.some(day => day.slots.some(slot => slot.state === '空' && (!isTime(slot.start) || !isTime(slot.end)))); }
       function updateSaveState() {
         const incomplete = hasIncompleteTime();
         saveButton.disabled = incomplete;
@@ -190,16 +321,32 @@
       }
       function updateDay(event) {
         const target = event.target;
-        const index = Number(target.dataset.index);
+        const dayIndex = Number(target.dataset.dayIndex);
+        const slotIndex = Number(target.dataset.slotIndex);
         const field = target.dataset.field;
-        if (!Number.isInteger(index) || !field) return;
-        state.days[index][field] = target.value;
-        if (field === 'state') target.closest('.day-field').querySelector('.time-fields').classList.toggle('is-hidden', target.value === '満');
+        if (!Number.isInteger(dayIndex) || !Number.isInteger(slotIndex) || !field) return;
+        state.days[dayIndex].slots[slotIndex][field] = target.value;
+        if (field === 'state') makeFields();
         saveState(); requestDraw(); updateSaveState();
       }
       fields.addEventListener('input', updateDay);
       fields.addEventListener('change', updateDay);
+      fields.addEventListener('click', event => {
+        const button = event.target.closest('button[data-action]');
+        if (!button) return;
+        const dayIndex = Number(button.dataset.dayIndex);
+        if (!Number.isInteger(dayIndex)) return;
+        const slots = state.days[dayIndex].slots;
+        if (button.dataset.action === 'add-slot' && slots.length < MAX_SLOTS_PER_DAY) slots.push({ state: '空', start: '09:00', end: '18:00' });
+        if (button.dataset.action === 'remove-slot') {
+          const slotIndex = Number(button.dataset.slotIndex);
+          if (Number.isInteger(slotIndex) && slotIndex > 0) slots.splice(slotIndex, 1);
+        }
+        makeFields(); saveState(); requestDraw(); updateSaveState();
+      });
       borderToggle.addEventListener('change', () => { state.showBorder = borderToggle.checked; saveState(); drawPreview(); });
+      backgroundModeInput.addEventListener('change', () => { state.backgroundMode = backgroundModeInput.value; saveState(); requestDraw(); });
+      slotLayoutModeInput.addEventListener('change', () => { state.slotLayoutMode = slotLayoutModeInput.value; saveState(); requestDraw(); });
       async function readImageDimensions(file) {
         const bytes = new Uint8Array(await file.slice(0, 1024 * 1024).arrayBuffer());
         const read16 = offset => (bytes[offset] << 8) | bytes[offset + 1];
@@ -242,16 +389,16 @@
         if (!file) return;
         const loadVersion = ++backgroundLoadVersion;
         const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
-        const maximumFileSize = 8 * 1024 * 1024;
+        const maximumFileSize = 30 * 1024 * 1024;
         if (!allowedTypes.includes(file.type) || file.size > maximumFileSize) {
-          clearBackground('JPEG・PNG・WebP・HEIC形式で、8MB以下の画像を選んでください。');
+          clearBackground('JPEG・PNG・WebP・HEIC形式で、30MB以下の画像を選んでください。');
           return;
         }
-        const maximumPixels = 8000000;
+        const maximumPixels = 48000000;
         const dimensions = await readImageDimensions(file).catch(() => null);
         if (loadVersion !== backgroundLoadVersion) return;
         if (dimensions && (dimensions.width * dimensions.height > maximumPixels)) {
-          clearBackground('画像の大きさは800万画素以下にしてください。');
+          clearBackground('画像の大きさは4,800万画素以下にしてください。');
           return;
         }
         const imageUrl = URL.createObjectURL(file);
@@ -260,7 +407,7 @@
           URL.revokeObjectURL(imageUrl);
           if (loadVersion !== backgroundLoadVersion) return;
           if (image.naturalWidth * image.naturalHeight > maximumPixels) {
-            clearBackground('画像の大きさは800万画素以下にしてください。');
+            clearBackground('画像の大きさは4,800万画素以下にしてください。');
             return;
           }
           backgroundImage = image;
@@ -297,7 +444,9 @@
         }, 'image/png');
       });
       borderToggle.checked = state.showBorder;
-      makeFields(); drawPreview(); updateSaveState();
+      backgroundModeInput.value = state.backgroundMode;
+      slotLayoutModeInput.value = state.slotLayoutMode;
+      makeFields(); drawPreview(); updateSaveState(); saveState();
     })();
   </script>
 </body>
