@@ -590,11 +590,23 @@
         exportCanvas.getContext('2d').drawImage(canvas, 0, 0, state.outputSize, state.outputSize);
         const filename = 'schedule_' + state.outputSize + '_' + new Date().toISOString().slice(0, 10) + '.png';
         const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-        const savePage = isIOS ? window.open('', '_blank') : null;
-        if (isIOS && !savePage) {
-          backgroundMessage.textContent = '画像保存用の画面を開けませんでした。ポップアップを許可して、もう一度お試しください。';
-          return;
+        if (isIOS && typeof navigator.share === 'function' && typeof navigator.canShare === 'function' && typeof File === 'function') {
+          const dataUrl = exportCanvas.toDataURL('image/png');
+          const binary = atob(dataUrl.split(',')[1]);
+          const bytes = new Uint8Array(binary.length);
+          for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+          const file = new File([bytes], filename, { type: 'image/png' });
+          if (navigator.canShare({ files: [file] })) {
+            navigator.share({ files: [file], title: '出勤案内画像' }).then(() => {
+              backgroundMessage.textContent = '共有メニューで「画像を保存」を選ぶと、写真へ保存できます。';
+            }).catch(error => {
+              if (error && error.name !== 'AbortError') backgroundMessage.textContent = '共有メニューを開けませんでした。もう一度お試しください。';
+            });
+            return;
+          }
         }
+        const savePage = isIOS ? window.open('', '_blank') : null;
+        if (isIOS && !savePage) { backgroundMessage.textContent = '画像保存用の画面を開けませんでした。ポップアップを許可して、もう一度お試しください。'; return; }
         saveButton.disabled = true;
         exportCanvas.toBlob(blob => {
           if (!blob) { updateSaveState(); return; }
