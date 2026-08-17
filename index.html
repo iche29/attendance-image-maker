@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>出勤画像メーカー</title>
+  <style>
+    :root { color-scheme: light; --ink: #4d3850; --pink: #ef8fb1; --pink-soft: #fff1f6; --line: #f6bfd0; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-width: 320px; color: var(--ink); background: linear-gradient(135deg, #fff7fa, #f8f4ff); font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif; }
+    .app { width: min(1220px, 100%); margin: 0 auto; padding: 32px 20px 48px; }
+    header { margin-bottom: 24px; }
+    h1 { margin: 0; font-size: clamp(1.7rem, 4vw, 2.35rem); letter-spacing: .06em; }
+    header p { margin: 8px 0 0; color: #806b7b; }
+    .layout { display: grid; grid-template-columns: minmax(290px, 390px) minmax(0, 1fr); align-items: start; gap: 28px; }
+    .controls, .preview-card { background: rgba(255, 255, 255, .86); border: 1px solid rgba(239, 143, 177, .22); border-radius: 24px; box-shadow: 0 12px 32px rgba(110, 70, 95, .10); }
+    .controls { padding: 22px; }
+    h2 { margin: 0 0 15px; font-size: 1.1rem; }
+    .field-label { display: block; font-size: .88rem; font-weight: 700; margin-bottom: 7px; }
+    .upload { display: grid; gap: 8px; margin-bottom: 22px; }
+    input, select, button { font: inherit; }
+    input[type="file"], input[type="time"], select { width: 100%; min-height: 42px; border: 1px solid #e9cdd7; border-radius: 10px; padding: 8px 10px; background: #fff; color: var(--ink); }
+    .hint { margin: 0; color: #876f7c; font-size: .78rem; line-height: 1.55; }
+    .border-toggle { display: flex; align-items: center; gap: 9px; margin: 0 0 18px; font-size: .92rem; }
+    .border-toggle input { width: 18px; height: 18px; accent-color: var(--pink); }
+    .schedule-fields { display: grid; gap: 12px; }
+    .day-field { padding: 13px; background: var(--pink-soft); border-radius: 14px; }
+    .day-top, .time-fields { display: grid; align-items: end; gap: 9px; }
+    .day-top { grid-template-columns: 55px 1fr; }
+    .day-name { padding-bottom: 10px; font-weight: 800; }
+    .time-fields { grid-template-columns: 1fr 1fr; margin-top: 10px; }
+    .time-fields label { display: grid; gap: 5px; font-size: .78rem; font-weight: 700; }
+    .time-fields.is-hidden { display: none; }
+    .preview-card { padding: 18px; }
+    .preview-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 0 0 13px; }
+    .preview-heading h2 { margin: 0; }
+    .canvas-wrap { overflow: hidden; border-radius: 15px; background: #eee; box-shadow: 0 5px 16px rgba(50, 32, 44, .12); }
+    canvas { display: block; width: 100%; height: auto; aspect-ratio: 1; }
+    .save-row { margin-top: 16px; }
+    button { width: 100%; min-height: 50px; border: 0; border-radius: 999px; cursor: pointer; background: linear-gradient(135deg, #ef86ac, #d874a1); color: white; font-weight: 800; box-shadow: 0 7px 14px rgba(202, 87, 137, .25); }
+    button:hover:not(:disabled) { filter: brightness(1.03); }
+    button:disabled { cursor: not-allowed; opacity: .55; box-shadow: none; }
+    button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid rgba(239, 143, 177, .42); outline-offset: 2px; }
+    @media (max-width: 760px) { .app { padding: 22px 14px 36px; } .layout { grid-template-columns: 1fr; gap: 20px; } .preview-card { order: 2; } .controls { order: 1; } }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header>
+      <h1>出勤画像メーカー</h1>
+      <p>背景を選んで、空・満と時間を入力するだけ。SNS用の出勤案内を作れます。</p>
+    </header>
+    <div class="layout">
+      <section class="controls" aria-label="出勤情報の入力">
+        <div class="upload">
+          <label class="field-label" for="backgroundInput">背景画像</label>
+          <input id="backgroundInput" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif">
+          <p class="hint">画像はこの端末のブラウザ内だけで使います。小さい画像はタイル状に繰り返します。</p>
+          <p id="backgroundMessage" class="hint" role="status" aria-live="polite"></p>
+        </div>
+        <label class="border-toggle"><input id="borderToggle" type="checkbox" checked> パネルにピンクの枠線を付ける</label>
+        <h2>平日の出勤予定</h2>
+        <div id="scheduleFields" class="schedule-fields"></div>
+      </section>
+      <section class="preview-card" aria-label="完成イメージ">
+        <div class="preview-heading"><h2>プレビュー</h2><span class="hint">1080 × 1080 px</span></div>
+        <div class="canvas-wrap"><canvas id="preview" width="1080" height="1080" aria-label="出勤案内画像のプレビュー"></canvas></div>
+        <div class="save-row"><button id="saveButton" type="button">PNG保存</button></div>
+      </section>
+    </div>
+  </main>
+  <script>
+    (() => {
+      'use strict';
+      const STORAGE_KEY = 'attendance-image-maker-v1';
+      const DAYS = [
+        { label: '月曜日', state: '空', start: '10:30', end: '11:30' },
+        { label: '火曜日', state: '満', start: '10:30', end: '11:30' },
+        { label: '水曜日', state: '空', start: '09:30', end: '13:00' },
+        { label: '木曜日', state: '空', start: '09:30', end: '13:00' },
+        { label: '金曜日', state: '空', start: '09:30', end: '11:00' }
+      ];
+      const canvas = document.querySelector('#preview');
+      const ctx = canvas.getContext('2d');
+      const fields = document.querySelector('#scheduleFields');
+      const backgroundInput = document.querySelector('#backgroundInput');
+      const backgroundMessage = document.querySelector('#backgroundMessage');
+      const borderToggle = document.querySelector('#borderToggle');
+      const saveButton = document.querySelector('#saveButton');
+      let backgroundImage = null;
+      let state = loadState();
+      let drawQueued = false;
+      let backgroundLoadVersion = 0;
+
+      function loadState() {
+        try {
+          const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+          if (saved && Array.isArray(saved.days) && saved.days.length === DAYS.length) {
+            return {
+              days: saved.days.map((day, index) => ({
+                ...DAYS[index],
+                state: day && day.state === '満' ? '満' : '空',
+                start: isTime(day && day.start) ? day.start : DAYS[index].start,
+                end: isTime(day && day.end) ? day.end : DAYS[index].end
+              })),
+              showBorder: saved.showBorder !== false
+            };
+          }
+        } catch (_) { /* 保存内容が壊れている場合は初期値を使う */ }
+        return { days: DAYS.map(day => ({ ...day })), showBorder: true };
+      }
+      function isTime(value) { return typeof value === 'string' && /^([01]\\d|2[0-3]):[0-5]\\d$/.test(value); }
+      function saveState() {
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ days: state.days, showBorder: state.showBorder })); }
+        catch (_) { /* 保存できなくてもプレビューとPNG生成は継続する */ }
+      }
+      function makeFields() {
+        fields.replaceChildren(...state.days.map((day, index) => {
+          const row = document.createElement('div');
+          row.className = 'day-field';
+          row.innerHTML = `
+            <div class="day-top"><span class="day-name">${day.label}</span><label><span class="field-label">状態</span><select data-index="${index}" data-field="state"><option value="空">空</option><option value="満">満</option></select></label></div>
+            <div class="time-fields"><label>開始時間<input type="time" data-index="${index}" data-field="start"></label><label>終了時間<input type="time" data-index="${index}" data-field="end"></label></div>`;
+          row.querySelector('select').value = day.state;
+          row.querySelector('[data-field="start"]').value = day.start;
+          row.querySelector('[data-field="end"]').value = day.end;
+          row.querySelector('.time-fields').classList.toggle('is-hidden', day.state === '満');
+          return row;
+        }));
+      }
+      function formatTime(value) {
+        if (!isTime(value)) return '';
+        const [hourText, minuteText] = value.split(':');
+        const hour = Number(hourText);
+        const minute = Number(minuteText);
+        if (!Number.isFinite(hour) || !Number.isFinite(minute)) return '';
+        return minute === 0 ? `${hour}時` : `${hour}時${minute}分`;
+      }
+      function drawFallbackBackground() {
+        ctx.fillStyle = '#f9e7ed'; ctx.fillRect(0, 0, 1080, 1080);
+        ctx.fillStyle = '#f5d5e1';
+        for (let y = -40; y < 1080; y += 120) for (let x = -40; x < 1080; x += 120) { ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2); ctx.fill(); }
+      }
+      function drawTiledBackground() {
+        if (!backgroundImage) return drawFallbackBackground();
+        const pattern = ctx.createPattern(backgroundImage, 'repeat');
+        if (pattern) { ctx.fillStyle = pattern; ctx.fillRect(0, 0, 1080, 1080); }
+      }
+      function roundedRect(x, y, width, height, radius) {
+        const r = Math.min(radius, width / 2, height / 2);
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.arcTo(x + width, y, x + width, y + height, r);
+        ctx.arcTo(x + width, y + height, x, y + height, r);
+        ctx.arcTo(x, y + height, x, y, r);
+        ctx.arcTo(x, y, x + width, y, r);
+        ctx.closePath();
+      }
+      function drawPreview() {
+        ctx.clearRect(0, 0, 1080, 1080);
+        drawTiledBackground();
+        const panel = { x: 92, y: 160, width: 896, height: 760, radius: 48 };
+        roundedRect(panel.x, panel.y, panel.width, panel.height, panel.radius);
+        ctx.fillStyle = 'rgba(255, 255, 255, .82)'; ctx.fill();
+        if (state.showBorder) { ctx.strokeStyle = 'rgba(239, 143, 177, .72)'; ctx.lineWidth = 4; ctx.stroke(); }
+        ctx.textBaseline = 'middle';
+        const firstY = 293, rowHeight = 120;
+        state.days.forEach((day, index) => {
+          const y = firstY + index * rowHeight;
+          if (index > 0) { ctx.save(); ctx.setLineDash([4, 12]); ctx.strokeStyle = 'rgba(221, 152, 178, .52)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(180, y - 60); ctx.lineTo(900, y - 60); ctx.stroke(); ctx.restore(); }
+          ctx.fillStyle = '#6f5264'; ctx.font = '700 34px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif'; ctx.fillText(day.label, 188, y);
+          ctx.font = '36px "Apple Color Emoji", "Segoe UI Emoji", sans-serif'; ctx.fillText(day.state === '空' ? '🈳' : '🈵', 410, y);
+          if (day.state === '空') {
+            const start = formatTime(day.start), end = formatTime(day.end);
+            if (start && end) { ctx.fillStyle = '#42303d'; ctx.font = '700 45px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif'; ctx.fillText(`${start}～${end}`, 500, y); }
+            else { ctx.fillStyle = '#a16f82'; ctx.font = '600 29px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif'; ctx.fillText('開始・終了時間を入力してください', 500, y); }
+          }
+        });
+      }
+      function requestDraw() {
+        if (drawQueued) return;
+        drawQueued = true;
+        requestAnimationFrame(() => { drawQueued = false; drawPreview(); });
+      }
+      function hasIncompleteTime() { return state.days.some(day => day.state === '空' && (!isTime(day.start) || !isTime(day.end))); }
+      function updateSaveState() {
+        const incomplete = hasIncompleteTime();
+        saveButton.disabled = incomplete;
+        saveButton.textContent = incomplete ? '開始・終了時間を入力してください' : 'PNG保存';
+      }
+      function updateDay(event) {
+        const target = event.target;
+        const index = Number(target.dataset.index);
+        const field = target.dataset.field;
+        if (!Number.isInteger(index) || !field) return;
+        state.days[index][field] = target.value;
+        if (field === 'state') target.closest('.day-field').querySelector('.time-fields').classList.toggle('is-hidden', target.value === '満');
+        saveState(); requestDraw(); updateSaveState();
+      }
+      fields.addEventListener('input', updateDay);
+      fields.addEventListener('change', updateDay);
+      borderToggle.addEventListener('change', () => { state.showBorder = borderToggle.checked; saveState(); drawPreview(); });
+      async function readImageDimensions(file) {
+        const bytes = new Uint8Array(await file.slice(0, 1024 * 1024).arrayBuffer());
+        const read16 = offset => (bytes[offset] << 8) | bytes[offset + 1];
+        const read24 = offset => (bytes[offset] << 16) | (bytes[offset + 1] << 8) | bytes[offset + 2];
+        const read32 = offset => (bytes[offset] * 2 ** 24) + (bytes[offset + 1] << 16) + (bytes[offset + 2] << 8) + bytes[offset + 3];
+        const ascii = (offset, text) => text.split('').every((char, index) => bytes[offset + index] === char.charCodeAt(0));
+        if (ascii(1, 'PNG') && bytes.length >= 24) return { width: (bytes[16] * 2 ** 24) + read16(18), height: (bytes[20] * 2 ** 24) + read16(22) };
+        if (ascii(0, 'RIFF') && ascii(8, 'WEBP')) {
+          if (ascii(12, 'VP8X') && bytes.length >= 30) return { width: read24(24) + 1, height: read24(27) + 1 };
+          if (ascii(12, 'VP8 ') && bytes.length >= 30) return { width: read16(26) & 0x3fff, height: read16(28) & 0x3fff };
+          if (ascii(12, 'VP8L') && bytes.length >= 25 && bytes[20] === 0x2f) return { width: 1 + bytes[21] + ((bytes[22] & 0x3f) << 8), height: 1 + ((bytes[22] & 0xc0) >> 6) + (bytes[23] << 2) + ((bytes[24] & 0x0f) << 10) };
+        }
+        if ((file.type === 'image/heic' || file.type === 'image/heif') && bytes.length >= 20) {
+          for (let offset = 0; offset + 16 < bytes.length; offset += 1) {
+            if (ascii(offset, 'ispe')) return { width: read32(offset + 8), height: read32(offset + 12) };
+          }
+        }
+        if (bytes[0] === 0xff && bytes[1] === 0xd8) {
+          let offset = 2;
+          while (offset + 8 < bytes.length) {
+            if (bytes[offset] !== 0xff) { offset += 1; continue; }
+            while (bytes[offset] === 0xff) offset += 1;
+            const marker = bytes[offset++];
+            const length = read16(offset);
+            if (length < 2 || offset + length > bytes.length) break;
+            if ((marker >= 0xc0 && marker <= 0xc3) || (marker >= 0xc5 && marker <= 0xc7) || (marker >= 0xc9 && marker <= 0xcb) || (marker >= 0xcd && marker <= 0xcf)) return { width: read16(offset + 5), height: read16(offset + 3) };
+            offset += length;
+          }
+        }
+        return null;
+      }
+      function clearBackground(message) {
+        backgroundImage = null;
+        backgroundInput.value = '';
+        backgroundMessage.textContent = message;
+        requestDraw();
+      }
+      backgroundInput.addEventListener('change', async () => {
+        const file = backgroundInput.files && backgroundInput.files[0];
+        if (!file) return;
+        const loadVersion = ++backgroundLoadVersion;
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+        const maximumFileSize = 8 * 1024 * 1024;
+        if (!allowedTypes.includes(file.type) || file.size > maximumFileSize) {
+          clearBackground('JPEG・PNG・WebP・HEIC形式で、8MB以下の画像を選んでください。');
+          return;
+        }
+        const maximumPixels = 8000000;
+        const dimensions = await readImageDimensions(file).catch(() => null);
+        if (loadVersion !== backgroundLoadVersion) return;
+        if (dimensions && (dimensions.width * dimensions.height > maximumPixels)) {
+          clearBackground('画像の大きさは800万画素以下にしてください。');
+          return;
+        }
+        const imageUrl = URL.createObjectURL(file);
+        const image = new Image();
+        image.onload = () => {
+          URL.revokeObjectURL(imageUrl);
+          if (loadVersion !== backgroundLoadVersion) return;
+          if (image.naturalWidth * image.naturalHeight > maximumPixels) {
+            clearBackground('画像の大きさは800万画素以下にしてください。');
+            return;
+          }
+          backgroundImage = image;
+          backgroundMessage.textContent = '';
+          requestDraw();
+        };
+        image.onerror = () => { URL.revokeObjectURL(imageUrl); if (loadVersion === backgroundLoadVersion) clearBackground('画像を読み込めませんでした。別の画像を選んでください。'); };
+        image.src = imageUrl;
+      });
+      saveButton.addEventListener('click', () => {
+        if (hasIncompleteTime()) return;
+        drawPreview();
+        const filename = `schedule_${new Date().toISOString().slice(0, 10)}.png`;
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        const savePage = isIOS ? window.open('', '_blank') : null;
+        if (isIOS && !savePage) {
+          backgroundMessage.textContent = '画像保存用の画面を開けませんでした。ポップアップを許可して、もう一度お試しください。';
+          return;
+        }
+        saveButton.disabled = true;
+        canvas.toBlob(blob => {
+          if (!blob) { updateSaveState(); return; }
+          const url = URL.createObjectURL(blob);
+          if (savePage) {
+            savePage.location.href = url;
+            backgroundMessage.textContent = '開いた画像を長押し、または共有メニューから写真へ保存してください。';
+            setTimeout(() => URL.revokeObjectURL(url), 60000);
+            updateSaveState();
+            return;
+          }
+          const link = document.createElement('a'); link.href = url; link.download = filename; link.click();
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+          updateSaveState();
+        }, 'image/png');
+      });
+      borderToggle.checked = state.showBorder;
+      makeFields(); drawPreview(); updateSaveState();
+    })();
+  </script>
+</body>
+</html>
