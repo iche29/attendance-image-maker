@@ -76,6 +76,11 @@
             <option value="separate">枠ごとに行を分ける</option>
             <option value="compact">曜日ごとに1行へまとめる</option>
           </select>
+          <label class="field-label" for="outputSize">画像サイズ</label>
+          <select id="outputSize">
+            <option value="800">CityHeaven向け (800 × 800)</option>
+            <option value="1080">SNS向け (1080 × 1080)</option>
+          </select>
         </div>
         <label class="border-toggle"><input id="borderToggle" type="checkbox" checked> パネルにピンクの枠線を付ける</label>
         <h2>平日の出勤予定</h2>
@@ -83,7 +88,7 @@
         <button id="resetScheduleButton" class="reset-button" type="button">出勤予定を初期値へ戻す</button>
       </section>
       <section class="preview-card" aria-label="完成イメージ">
-        <div class="preview-heading"><h2>プレビュー</h2><span class="hint">1080 × 1080 px</span></div>
+        <div class="preview-heading"><h2>プレビュー</h2><span id="previewSizeLabel" class="hint">800 × 800 px</span></div>
         <div class="canvas-wrap"><canvas id="preview" width="1080" height="1080" aria-label="出勤案内画像のプレビュー"></canvas></div>
         <div class="save-row"><button id="saveButton" type="button">PNG保存</button></div>
       </section>
@@ -109,6 +114,8 @@
       const backgroundMessage = document.querySelector('#backgroundMessage');
       const backgroundModeInput = document.querySelector('#backgroundMode');
       const slotLayoutModeInput = document.querySelector('#slotLayoutMode');
+      const outputSizeInput = document.querySelector('#outputSize');
+      const previewSizeLabel = document.querySelector('#previewSizeLabel');
       const borderToggle = document.querySelector('#borderToggle');
       const saveButton = document.querySelector('#saveButton');
       const resetScheduleButton = document.querySelector('#resetScheduleButton');
@@ -126,11 +133,12 @@
               days: saved.days.map((day, index) => normalizeDay(day, DAYS[index])),
               showBorder: saved.showBorder !== false,
               backgroundMode: currentSaved && ['tile', 'cover', 'center'].includes(saved.backgroundMode) ? saved.backgroundMode : DEFAULT_BACKGROUND_MODE,
-              slotLayoutMode: saved.slotLayoutMode === 'compact' ? 'compact' : 'separate'
+              slotLayoutMode: saved.slotLayoutMode === 'compact' ? 'compact' : 'separate',
+              outputSize: saved.outputSize === 1080 ? 1080 : 800
             };
           }
         } catch (_) { /* 保存内容が壊れている場合は初期値を使う */ }
-        return { days: createDefaultDays(), showBorder: true, backgroundMode: DEFAULT_BACKGROUND_MODE, slotLayoutMode: 'separate' };
+        return { days: createDefaultDays(), showBorder: true, backgroundMode: DEFAULT_BACKGROUND_MODE, slotLayoutMode: 'separate', outputSize: 800 };
       }
       function isTime(value) { return typeof value === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(value); }
       function normalizeSlot(slot) {
@@ -147,7 +155,7 @@
         return { label: fallback.label, status, slots: status === '満' ? [] : (availableSlots.length ? availableSlots : fallback.slots.map(slot => ({ ...slot }))) };
       }
       function saveState() {
-        try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ days: state.days, showBorder: state.showBorder, backgroundMode: state.backgroundMode, slotLayoutMode: state.slotLayoutMode })); }
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ days: state.days, showBorder: state.showBorder, backgroundMode: state.backgroundMode, slotLayoutMode: state.slotLayoutMode, outputSize: state.outputSize })); }
         catch (_) { /* 保存できなくてもプレビューとPNG生成は継続する */ }
       }
       function createDefaultDays() { return DAYS.map(day => ({ label: day.label, status: day.status, slots: day.slots.map(slot => ({ ...slot })) })); }
@@ -340,6 +348,7 @@
         saveButton.disabled = incomplete;
         saveButton.textContent = incomplete ? '開始・終了時間を入力してください' : 'PNG保存';
       }
+      function updateOutputSizeLabel() { previewSizeLabel.textContent = state.outputSize + ' × ' + state.outputSize + ' px'; }
       function updateDay(event) {
         const target = event.target;
         const dayIndex = Number(target.dataset.dayIndex);
@@ -371,6 +380,7 @@
       borderToggle.addEventListener('change', () => { state.showBorder = borderToggle.checked; saveState(); drawPreview(); });
       backgroundModeInput.addEventListener('change', () => { state.backgroundMode = backgroundModeInput.value; saveState(); requestDraw(); });
       slotLayoutModeInput.addEventListener('change', () => { state.slotLayoutMode = slotLayoutModeInput.value; saveState(); requestDraw(); });
+      outputSizeInput.addEventListener('change', () => { state.outputSize = Number(outputSizeInput.value); updateOutputSizeLabel(); saveState(); });
       resetScheduleButton.addEventListener('click', () => {
         if (!window.confirm('月曜日から金曜日までの出勤予定を、すべて「空・9:00〜18:00」へ戻します。よろしいですか？')) return;
         state.days = createDefaultDays();
@@ -449,7 +459,11 @@
       saveButton.addEventListener('click', () => {
         if (hasIncompleteTime()) return;
         drawPreview();
-        const filename = `schedule_${new Date().toISOString().slice(0, 10)}.png`;
+        const exportCanvas = document.createElement('canvas');
+        exportCanvas.width = state.outputSize;
+        exportCanvas.height = state.outputSize;
+        exportCanvas.getContext('2d').drawImage(canvas, 0, 0, state.outputSize, state.outputSize);
+        const filename = 'schedule_' + state.outputSize + '_' + new Date().toISOString().slice(0, 10) + '.png';
         const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
         const savePage = isIOS ? window.open('', '_blank') : null;
         if (isIOS && !savePage) {
@@ -457,7 +471,7 @@
           return;
         }
         saveButton.disabled = true;
-        canvas.toBlob(blob => {
+        exportCanvas.toBlob(blob => {
           if (!blob) { updateSaveState(); return; }
           const url = URL.createObjectURL(blob);
           if (savePage) {
@@ -475,7 +489,8 @@
       borderToggle.checked = state.showBorder;
       backgroundModeInput.value = state.backgroundMode;
       slotLayoutModeInput.value = state.slotLayoutMode;
-      makeFields(); drawPreview(); updateSaveState(); saveState();
+      outputSizeInput.value = String(state.outputSize);
+      makeFields(); drawPreview(); updateSaveState(); updateOutputSizeLabel(); saveState();
     })();
   </script>
 </body>
