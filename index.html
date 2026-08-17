@@ -27,11 +27,12 @@
     .day-field { padding: 16px; background: var(--pink-soft); border-radius: 14px; }
     .day-name { display: block; margin: 0 0 11px; font-size: 1.12rem; font-weight: 800; }
     .slot-list { display: grid; gap: 10px; }
-    .slot-card { padding: 12px; border: 1px solid rgba(239, 143, 177, .35); border-radius: 12px; background: rgba(255, 255, 255, .56); }
+    .slot-card { width: 100%; min-width: 0; padding: 12px; border: 1px solid rgba(239, 143, 177, .35); border-radius: 12px; background: rgba(255, 255, 255, .56); }
     .slot-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: .84rem; font-weight: 800; }
     .state-field { display: grid; gap: 5px; font-size: .78rem; font-weight: 700; }
-    .time-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: end; gap: 9px; margin-top: 10px; }
-    .time-fields label { display: grid; min-width: 0; gap: 5px; font-size: .78rem; font-weight: 700; }
+    .time-fields { display: grid; width: 100%; min-width: 0; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: end; gap: 9px; margin-top: 10px; }
+    .time-fields label { display: grid; width: 100%; min-width: 0; max-width: 100%; gap: 5px; font-size: .78rem; font-weight: 700; }
+    .time-fields input[type="time"] { display: block; inline-size: 100% !important; min-inline-size: 0 !important; max-inline-size: 100% !important; }
     .time-fields.is-hidden { display: none; }
     .preview-card { padding: 18px; }
     .preview-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 0 0 13px; }
