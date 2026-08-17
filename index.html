@@ -351,7 +351,7 @@
           if (displayRows.length === rowCount) break;
           rowCount = displayRows.length;
         }
-        const rowUnits = displayRows.reduce((total, row) => total + (row.compactSlots && !row.firstOfDay ? .62 : 1), 0);
+        const rowUnits = displayRows.reduce((total, row) => total + (row.compactSlots && !row.firstOfDay ? .5 : 1), 0);
         const rowHeight = Math.min(120, Math.max(30, Math.floor(760 / rowUnits)));
         const contentHeight = rowHeight * rowUnits;
         const panelHeight = Math.min(960, contentHeight + 120);
@@ -364,7 +364,7 @@
         const timeFontSize = Math.min(45, Math.max(16, Math.round(rowHeight * .40)));
         let rowTop = panel.y + 60;
         displayRows.forEach((row, rowIndex) => {
-          const currentRowHeight = row.compactSlots && !row.firstOfDay ? rowHeight * .62 : rowHeight;
+          const currentRowHeight = row.compactSlots && !row.firstOfDay ? rowHeight * .5 : rowHeight;
           const y = rowTop + currentRowHeight / 2;
           if (row.dayIndex > 0 && row.firstOfDay) { ctx.save(); ctx.setLineDash([4, 12]); ctx.strokeStyle = 'rgba(221, 152, 178, .52)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(150, rowTop); ctx.lineTo(930, rowTop); ctx.stroke(); ctx.restore(); }
           if (row.showDay || row.message) { ctx.fillStyle = '#6f5264'; ctx.font = '700 ' + dayFontSize + 'px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif'; ctx.fillText(row.label, 150, y); }
